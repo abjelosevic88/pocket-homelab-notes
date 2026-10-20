@@ -11,6 +11,7 @@ import { BookmarkSheet, DiagramViewer, ExpenseSheet, FilesPicker, HabitsSheet, L
 import { HistoryModal, MoveModal, ShareModal } from './NoteDialogs'
 import { exportHTML, printNote } from '../lib/export'
 import { copyText } from '../lib/clipboard'
+import type { NoteAction } from './NoteMenu'
 
 type Status = 'saved' | 'dirty' | 'saving' | 'error' | 'conflict' | 'offline'
 type Sheet =
@@ -206,6 +207,10 @@ const NoteView = forwardRef<NoteViewHandle, { id: number; onBack?: () => void; e
     if (!note) return
     const t = title.trim()
     if (!t || t === note.title) { setTitle(note.title); return }
+    await renameTo(t)
+  }
+  const renameTo = async (t: string) => {
+    if (!note) return
     const text = cur.current.draft
     const lines = text.split('\n')
     const first = lines.findIndex(l => l.trim())
@@ -216,6 +221,31 @@ const NoteView = forwardRef<NoteViewHandle, { id: number; onBack?: () => void; e
     }
     await patch(content !== undefined ? { title: t, content } : { title: t })
   }
+  const remove = async () => {
+    if (!note) return
+    cur.current.draft = cur.current.saved
+    await api.del(`${V1}/notes/${note.id}`)
+    bump(); toast('Moved to the trash'); navigate(`/${location.search}`)
+  }
+
+  // The list's right-click menu on this very note: the change goes through here, after what
+  // is typed is saved, instead of past the editor (see NoteMenu).
+  const onAction = useRef<(a: NoteAction) => void>(() => {})
+  onAction.current = a => {
+    if (a.kind === 'patch') patch(a.body, a.msg)
+    else if (a.kind === 'rename') { setTitle(a.title); renameTo(a.title) }
+    else remove().catch(e => toast((e as Error).message, 'err'))
+  }
+  useEffect(() => {
+    const h = (e: Event) => {
+      const d = (e as CustomEvent<{ id: number; action: NoteAction }>).detail
+      if (embedded || d.id !== cur.current.id) return
+      e.preventDefault()
+      onAction.current(d.action)
+    }
+    window.addEventListener('pn:note-action', h)
+    return () => window.removeEventListener('pn:note-action', h)
+  }, [embedded])
 
   // ---- what goes into the note ----
 
@@ -466,7 +496,7 @@ const NoteView = forwardRef<NoteViewHandle, { id: number; onBack?: () => void; e
       {sheet?.kind === 'history' && <HistoryModal note={note} onClose={() => setSheet(null)} onRestored={n => { const c = cur.current; c.etag = n.etag; c.saved = n.content || ''; c.draft = c.saved; setNote(n); setDraft(c.saved); setRevision(r => r + 1); setSheet(null); toast('Restored') }} />}
       {sheet?.kind === 'share' && <ShareModal note={note} onClose={() => setSheet(null)} />}
       {sheet?.kind === 'move' && <MoveModal current={note.category} onClose={() => setSheet(null)} onMove={async cat => { setSheet(null); await patch({ category: cat }, `Moved to ${cat || 'Notes'}`) }} />}
-      {sheet?.kind === 'delete' && <Confirm title={`Delete “${note.title}”?`} message={<>It goes to the trash (Trash in the sidebar) for {settings?.trash_days ?? 30} days{settings?.storage_kind === 'nextcloud' ? ', and to Nextcloud’s own trash bin' : ''}.</>} onCancel={() => setSheet(null)} onConfirm={async () => { setSheet(null); cur.current.draft = cur.current.saved; await api.del(`${V1}/notes/${note.id}`); bump(); toast('Moved to the trash'); navigate(`/${location.search}`) }} />}
+      {sheet?.kind === 'delete' && <Confirm title={`Delete “${note.title}”?`} message={<>It goes to the trash (Trash in the sidebar) for {settings?.trash_days ?? 30} days{settings?.storage_kind === 'nextcloud' ? ', and to Nextcloud’s own trash bin' : ''}.</>} onCancel={() => setSheet(null)} onConfirm={async () => { setSheet(null); await remove() }} />}
     </div>
   )
 })

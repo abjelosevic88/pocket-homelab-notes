@@ -571,3 +571,8 @@ select.xs { width: auto; padding: 2px 6px; font-size: 12px; border-radius: 6px; 
   .trash-table td { padding-left: 8px; padding-right: 8px; }
   .trash-table td .row { flex-direction: column; align-items: stretch; gap: 4px; }
 }
+/* Right-click menu on a note in the list. */
+.ctx-scrim { position: fixed; inset: 0; z-index: 59; }
+.ctx-menu hr { margin: 4px 2px; border: 0; border-top: 1px solid var(--border); }
+.ctx-menu .danger-text { color: var(--danger); }
+.note-row.menu-on { box-shadow: inset 0 0 0 2px var(--accent); }

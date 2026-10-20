@@ -7,6 +7,7 @@ import { ago, leaf, snippetParts, stamp } from '../lib/format'
 import { Empty, Loading, useDebounce, useToast } from '../components/ui'
 import NoteView from '../components/NoteView'
 import { newNoteIn } from '../components/Layout'
+import { NoteMenu } from '../components/NoteMenu'
 
 // All notes, a folder, a tag, favourites, recent or a search, with the note on the right.
 export default function Notes() {
@@ -24,6 +25,7 @@ export default function Notes() {
   const [notes, setNotes] = useState<(Note | SearchHit)[] | null>(null)
   const [err, setErr] = useState('')
   const [sub, setSub] = useState(() => localStorage.getItem('pn-subfolders') !== '0')
+  const [menu, setMenu] = useState<{ note: Note; x: number; y: number } | null>(null)
   useEffect(() => { localStorage.setItem('pn-sort', sort) }, [sort])
   useEffect(() => { localStorage.setItem('pn-subfolders', sub ? '1' : '0') }, [sub])
   useEffect(() => { setQ(params.get('q') || '') }, [params])
@@ -59,6 +61,7 @@ export default function Notes() {
     setParams(p, { replace: true })
   }
   const back = () => navigate(`/${params.toString() ? '?' + params.toString() : ''}`)
+  const onMenu = (n: Note, e: React.MouseEvent) => { e.preventDefault(); setMenu({ note: n, x: e.clientX, y: e.clientY }) }
   const pinned = useMemo(() => (notes || []).filter(n => n.pinned && !q.trim()), [notes, q])
   const rest = useMemo(() => (notes || []).filter(n => !(n.pinned && !q.trim())), [notes, q])
 
@@ -83,22 +86,23 @@ export default function Notes() {
           {!notes && !err && <Loading />}
           {notes && notes.length === 0 && <Empty title={q ? 'Nothing found' : 'No notes here yet'}>{q ? 'Try fewer words, or tag:, in:, is:fav, has:tasks.' : 'Make one with ＋ or press Alt+N.'}</Empty>}
           {pinned.length > 0 && <div className="list-group">Pinned</div>}
-          {pinned.map(n => <Row key={n.id} n={n} active={n.id === selected} params={params} showFolder={folder == null} />)}
+          {pinned.map(n => <Row key={n.id} n={n} active={n.id === selected} menu={menu?.note.id === n.id} onMenu={onMenu} params={params} showFolder={folder == null} />)}
           {pinned.length > 0 && rest.length > 0 && <div className="list-group">Notes</div>}
-          {rest.map(n => <Row key={n.id} n={n} active={n.id === selected} params={params} showFolder={folder == null || (sub && n.category !== folder)} />)}
+          {rest.map(n => <Row key={n.id} n={n} active={n.id === selected} menu={menu?.note.id === n.id} onMenu={onMenu} params={params} showFolder={folder == null || (sub && n.category !== folder)} />)}
         </div>
       </section>
       <section className="note-pane">
         {selected ? <NoteView id={selected} onBack={back} /> : <Welcome />}
       </section>
+      {menu && <NoteMenu note={menu.note} x={menu.x} y={menu.y} onClose={() => setMenu(null)} />}
     </div>
   )
 }
 
-function Row({ n, active, params, showFolder }: { n: Note | SearchHit; active: boolean; params: URLSearchParams; showFolder: boolean }) {
+function Row({ n, active, menu, onMenu, params, showFolder }: { n: Note | SearchHit; active: boolean; menu: boolean; onMenu: (n: Note, e: React.MouseEvent) => void; params: URLSearchParams; showFolder: boolean }) {
   const snippet = 'snippet' in n && n.snippet && n.snippet !== n.excerpt ? n.snippet : ''
   return (
-    <Link to={`/note/${n.id}${params.toString() ? '?' + params.toString() : ''}`} className={`note-row ${active ? 'active' : ''}`}>
+    <Link to={`/note/${n.id}${params.toString() ? '?' + params.toString() : ''}`} className={`note-row ${active ? 'active' : ''} ${menu ? 'menu-on' : ''}`} onContextMenu={e => onMenu(n, e)}>
       <div className="row">
         <b className="grow ellipsis">{n.title || 'Untitled'}</b>
         {n.favorite && <span className="star" title="Favourite">★</span>}
