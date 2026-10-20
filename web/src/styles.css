@@ -483,3 +483,6 @@ select.xs { width: auto; padding: 2px 6px; font-size: 12px; border-radius: 6px; 
   .weather .sky { font-size: 22px; }
   .today-nav { margin-left: auto; }
 }
+.capture-big .stamp { white-space: nowrap; flex-shrink: 0; line-height: 1.4; }
+.capture-big input { min-width: 0; }
+.capture-big .btn { flex-shrink: 0; }

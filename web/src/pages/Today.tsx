@@ -162,7 +162,7 @@ export default function Today() {
       {data && <div className="today-grid">
         <section className="today-main">
           <form className="capture-big" onSubmit={doCapture}>
-            <span className="stamp">{isToday ? stamp : date.slice(5)}</span>
+            <span className="stamp" title={isToday ? 'Lines get the time they are added' : 'Lines go into this day’s note'}>{isToday ? stamp : d.toLocaleDateString(undefined, { day: 'numeric', month: 'short' })}</span>
             <input value={capture} onChange={e => setCapture(e.target.value)} placeholder={data.note ? 'Add a line to this day…' : 'Write the first line of this day…'} disabled={busy} />
             <button className="btn primary sm" disabled={busy || !capture.trim()}>{busy ? '…' : 'Add'}</button>
           </form>
