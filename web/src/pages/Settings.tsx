@@ -229,6 +229,15 @@ function Integrations() {
   )
 }
 
+// The services' logos (dashboard-icons, as Pocket Core ships them) and the Pocket apps' own icons.
+const ICON_FILES: Record<string, string> = { backrest: 'backrest.png' }
+function IntegrationIcon({ i }: { i: Integration }) {
+  const [broken, setBroken] = useState(false)
+  const src = `/icons/${i.kind === 'app' ? `pocket-${i.name}.svg` : ICON_FILES[i.name] || `${i.name}.svg`}`
+  if (broken) return <span className="integration-icon fallback">{i.title.replace(/^Pocket /, '').slice(0, 1)}</span>
+  return <img className="integration-icon" src={src} alt="" width={36} height={36} onError={() => setBroken(true)} />
+}
+
 function IntegrationRow({ i, core, onSaved }: { i: Integration; core: boolean; onSaved: () => void }) {
   const { toast } = useToast()
   const [mode, setMode] = useState(i.mode)
@@ -247,6 +256,7 @@ function IntegrationRow({ i, core, onSaved }: { i: Integration; core: boolean; o
   return (
     <div className="integration">
       <div className="row wrap">
+        <IntegrationIcon i={i} />
         <div className="grow"><b>{i.title}</b><div className="muted small">{i.reason}</div></div>
         <Segmented size="sm" value={mode} onChange={setMode} options={[...(core ? [{ value: 'core' as const, label: 'Pocket Core' }] : []), { value: 'direct' as const, label: 'Direct' }, { value: 'off' as const, label: 'Off' }]} />
       </div>

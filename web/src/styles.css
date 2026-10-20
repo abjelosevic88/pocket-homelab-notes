@@ -486,3 +486,9 @@ select.xs { width: auto; padding: 2px 6px; font-size: 12px; border-radius: 6px; 
 .capture-big .stamp { white-space: nowrap; flex-shrink: 0; line-height: 1.4; }
 .capture-big input { min-width: 0; }
 .capture-big .btn { flex-shrink: 0; }
+.integration .integration-icon { width: 36px; height: 36px; flex-shrink: 0; object-fit: contain; border-radius: 9px; }
+.integration .integration-icon.fallback { display: grid; place-items: center; background: var(--surface-2); color: var(--muted); font-weight: 700; }
+.integration-form { margin-left: 44px; }
+@media (max-width: 760px) { .integration-form { margin-left: 0; } }
+.integration > .row.mt-s { margin-left: 44px; }
+@media (max-width: 760px) { .integration > .row.mt-s { margin-left: 0; } }
