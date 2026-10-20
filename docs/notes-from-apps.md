@@ -9,6 +9,15 @@ still works if either app is taken away.
 Each app then shows a **Notes** box on the thing's page: the person's notes that link there, and
 **+ New note**, which opens Pocket Notes with a note already linked.
 
+## From inside a note
+
+**Link to something** (`/` in the editor, or Homelab ▾ in Markdown mode) searches your books in
+Pocket Bookshelf and your episodes in Pocket Podcasts along with files, documents and the rest.
+Picking one inserts `[📖 Dune — Frank Herbert](…/books/12)` or `[🎧 Episode — Show](…/episodes/7)`;
+an episode you are part-way through is offered a second time at the moment reached
+(`…/episodes/7?t=754`). Pasting a book's or an episode's address by hand works the same. Notes
+reaches the two apps through Pocket Core (links `books:read`, `history:read`).
+
 ## The two calls
 
 **Which notes are about this?** — as the person, through Pocket Core:

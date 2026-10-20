@@ -20,7 +20,7 @@ export function toolError(e: unknown): string {
 interface LinkItem { id: string; title: string; detail: string; url: string; icon: string; markdown: string }
 interface LinkAnswer { sections: { source: string; title: string; items: LinkItem[] }[]; errors?: Record<string, string>; note?: string }
 
-const ICONS: Record<string, string> = { file: '📄', folder: '📁', document: '🧾', issue: '◎', pull: '⇄', movie: '🎬', series: '📺', episode: '📺', photo: '🖼', link: '🔗' }
+const ICONS: Record<string, string> = { file: '📄', folder: '📁', document: '🧾', book: '📖', podcast: '🎧', moment: '⏱', issue: '◎', pull: '⇄', movie: '🎬', series: '📺', episode: '📺', photo: '🖼', link: '🔗' }
 
 export function LinkPicker({ onPick, onClose }: { onPick: (md: string) => void; onClose: () => void }) {
   const [q, setQ] = useState('')
@@ -38,7 +38,7 @@ export function LinkPicker({ onPick, onClose }: { onPick: (md: string) => void; 
   const sections = data?.sections?.filter(s => s.items.length) || []
   return (
     <Modal title="Link to something" onClose={onClose} size="lg">
-      <div className="tool-search"><span className="muted">⌕</span><input autoFocus value={q} onChange={e => setQ(e.target.value)} placeholder="Search files, documents, issues, films, photos…" />{busy && <span className="spinner" />}</div>
+      <div className="tool-search"><span className="muted">⌕</span><input autoFocus value={q} onChange={e => setQ(e.target.value)} placeholder="Search files, documents, books, episodes, issues, films, photos…" />{busy && <span className="spinner" />}</div>
       <div className="tool-results">
         {err && <div className="callout danger">{err}</div>}
         {!sections.length && !busy && !err && <p className="muted center pad">{q.trim().length < 2 ? 'Type a few letters. The note gets a link to what you pick, not a copy.' : `Nothing matches “${q}”.`}</p>}

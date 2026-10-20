@@ -6,8 +6,11 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"strings"
 	"testing"
+
+	"github.com/abjelosevic88/pocket-homelab-notes/internal/store"
 )
 
 // connectDirect points a person's integration at a fake, as Settings does.
@@ -432,5 +435,52 @@ func TestBookmarkTitles(t *testing.T) {
 	}
 	if got := webLinkMarkdown("A [b]\nc", "https://x.org/a (1)"); got != "[A b c](https://x.org/a%20%281%29)" {
 		t.Errorf("markdown %q", got)
+	}
+}
+
+// Books and episodes from the Pocket apps, linked to their pages there; an
+// episode part-way through comes again at the moment reached.
+func TestLinkBooksAndEpisodes(t *testing.T) {
+	h := newHarness(t)
+	alice, tok := h.user("alice@example.com")
+	shelf := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/api/v1/books" || r.URL.Query().Get("q") != "dune" || r.Header.Get("Authorization") != "Bearer pb_alice" {
+			t.Errorf("bookshelf %s", r.URL)
+		}
+		_, _ = io.WriteString(w, `[{"id":12,"title":"Dune","authors":"Frank Herbert","published":"1965","status":"reading"}]`)
+	}))
+	defer shelf.Close()
+	pods := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/api/v1/episodes" || r.Header.Get("Authorization") != "Bearer pp_alice" {
+			t.Errorf("podcasts %s", r.URL)
+		}
+		_, _ = io.WriteString(w, `{"episodes":[{"id":7,"title":"Dune, part one","podcast_title":"Book Club","pub_date":"2026-10-01T08:00:00Z","duration":3700,"play_position":754.6,"completed":false},
+			{"id":8,"title":"Dune, part two","podcast_title":"Book Club","duration":1800,"play_position":1790,"completed":true}]}`)
+	}))
+	defer pods.Close()
+	connectApp(t, h, alice.ID, "bookshelf", shelf.URL, "pb_alice")
+	connectApp(t, h, alice.ID, "podcasts", pods.URL, "pp_alice")
+
+	var a linkAnswer
+	if c := h.do(tok, "GET", "/api/v1/tools/link?q=dune", nil, &a); c != 200 || len(a.Errors) != 0 {
+		t.Fatalf("link: %d %v", c, a.Errors)
+	}
+	b := a.section("bookshelf")
+	if len(b) != 1 || b[0].Icon != "book" || b[0].Detail != "Frank Herbert · 1965 · reading" || b[0].Markdown != "[📖 Dune — Frank Herbert]("+shelf.URL+"/books/12)" {
+		t.Errorf("books %+v", b)
+	}
+	e := a.section("podcasts")
+	if len(e) != 3 || e[0].Markdown != "[🎧 Dune, part one — Book Club]("+pods.URL+"/episodes/7)" || e[0].Detail != "Book Club · 1 Oct 2026 · 1 h 2 min" ||
+		e[1].Markdown != "[🎧 Dune, part one — Book Club at 12:34]("+pods.URL+"/episodes/7?t=754)" || e[2].URL != pods.URL+"/episodes/8" {
+		t.Errorf("episodes %+v", e)
+	}
+	// The note linked here is the one those pages list.
+	var n store.Note
+	h.do(tok, "POST", "/api/v1/notes", map[string]any{"title": "Dune", "content": "# Dune\n\n" + b[0].Markdown + "\n" + e[1].Markdown + "\n"}, &n)
+	var m []store.Note
+	for _, u := range []string{shelf.URL + "/books/12", pods.URL + "/episodes/7"} {
+		if h.do(tok, "GET", "/api/v1/mentions?url="+url.QueryEscape(u), nil, &m); len(m) != 1 || m[0].ID != n.ID {
+			t.Errorf("mentions of %s: %+v", u, m)
+		}
 	}
 }

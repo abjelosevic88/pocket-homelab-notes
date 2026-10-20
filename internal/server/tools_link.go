@@ -17,8 +17,9 @@ import (
 	"unicode/utf8"
 )
 
-// Links to what lives elsewhere (Nextcloud files, Pocket Documents, Forgejo
-// issues, Jellyfin titles, Immich photos) and web bookmarks. The note gets a
+// Links to what lives elsewhere (Nextcloud files, Pocket Documents, books in
+// Pocket Bookshelf, podcast episodes, Forgejo issues, Jellyfin titles, Immich
+// photos) and web bookmarks. The note gets a
 // link, not a copy.
 
 // webLinkMarkdown is a Markdown link to an absolute address: brackets and line
@@ -57,6 +58,8 @@ var linkSources = []struct {
 }{
 	{"svc", "nextcloud", "Nextcloud", linkNextcloud},
 	{"app", "documents", "Pocket Documents", linkDocuments},
+	{"app", "bookshelf", "Pocket Bookshelf", linkBooks},
+	{"app", "podcasts", "Pocket Podcasts", linkEpisodes},
 	{"svc", "forgejo", "Forgejo", linkForgejo},
 	{"svc", "jellyfin", "Jellyfin", linkJellyfin},
 	{"svc", "immich", "Immich", linkImmich},

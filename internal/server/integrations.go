@@ -44,7 +44,7 @@ var serviceNames = map[string]string{
 	"nextcloud": "Nextcloud", "immich": "Immich", "forgejo": "Forgejo", "jellyfin": "Jellyfin",
 	"jellystat": "Jellystat", "audiobookshelf": "Audiobookshelf", "kuma": "Uptime Kuma", "scrutiny": "Scrutiny", "backrest": "Backrest",
 	"adguard": "AdGuard Home", "glances": "Glances", "beszel": "Beszel",
-	"habits": "Pocket Habits", "money": "Pocket Money", "garage": "Pocket Garage", "podcasts": "Pocket Podcasts", "documents": "Pocket Documents",
+	"habits": "Pocket Habits", "money": "Pocket Money", "garage": "Pocket Garage", "podcasts": "Pocket Podcasts", "documents": "Pocket Documents", "bookshelf": "Pocket Bookshelf",
 }
 
 // directFields says what a typed-in connection asks for: the key's label and
@@ -54,7 +54,7 @@ var directFields = map[string][2]string{
 	"jellyfin": {"API key", "User id (optional)"}, "jellystat": {"API key", ""}, "audiobookshelf": {"Token", ""},
 	"kuma": {"API key (optional)", "Status page slug"}, "scrutiny": {"", ""}, "backrest": {"Password", "Username"}, "adguard": {"Password", "Username"},
 	"glances": {"", ""}, "beszel": {"Password", "Email"},
-	"habits": {"API token", ""}, "money": {"API token", ""}, "garage": {"API token", ""}, "podcasts": {"API token", ""}, "documents": {"API token", ""},
+	"habits": {"API token", ""}, "money": {"API token", ""}, "garage": {"API token", ""}, "podcasts": {"API token", ""}, "documents": {"API token", ""}, "bookshelf": {"API token", ""},
 }
 
 // errNotConnected is a tool asked for a service the person has not connected.
@@ -500,7 +500,7 @@ func (s *Server) handleTestIntegration(w http.ResponseWriter, r *http.Request) {
 // toolNeeds says what each editor tool needs: any one of the listed
 // services ("svc:x") or apps ("app:x") connected.
 var toolNeeds = map[string][]string{
-	"link":      {"svc:nextcloud", "app:documents", "svc:forgejo", "svc:jellyfin", "svc:immich"},
+	"link":      {"svc:nextcloud", "app:documents", "app:bookshelf", "app:podcasts", "svc:forgejo", "svc:jellyfin", "svc:immich"},
 	"photos":    {"svc:immich"},
 	"files":     {"svc:nextcloud"},
 	"bookmark":  {},
