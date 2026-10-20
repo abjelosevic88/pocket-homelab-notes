@@ -16,7 +16,7 @@ import (
 // scopes. Every route not listed in linkRoutes stays closed to it.
 
 var linkOffers = []core.Offer{
-	{Scope: "notes:read", Name: "Read your notes", Description: "List, search and read your notes, tags, tasks and daily notes (what Pocket Day shows in the journal)."},
+	{Scope: "notes:read", Name: "Read your notes", Description: "List, search and read your notes, tags, tasks and daily notes (what Pocket Day shows in the journal), and the notes about a book, an episode or a trip (shown on its page in that app)."},
 	{Scope: "notes:write", Name: "Write in your notes", Description: "Create notes, add lines to them and to today's daily note, tick tasks."},
 }
 
@@ -37,7 +37,7 @@ type linkRoute struct {
 
 var linkRoutes = []linkRoute{
 	{"GET", regexp.MustCompile(`^/api/v1/auth/me$`), ""},
-	{"GET", regexp.MustCompile(`^/api/v1/(notes|search|suggest|resolve|folders|tags|tasks|daily|calendar|dashboard|templates)$`), "notes:read"},
+	{"GET", regexp.MustCompile(`^/api/v1/(notes|search|suggest|resolve|mentions|folders|tags|tasks|daily|calendar|dashboard|templates)$`), "notes:read"},
 	{"GET", regexp.MustCompile(`^/api/v1/notes/\d+(/backlinks|/attachment)?$`), "notes:read"},
 	{"POST", regexp.MustCompile(`^/api/v1/(notes|capture|daily)$`), "notes:write"},
 	{"POST", regexp.MustCompile(`^/api/v1/notes/\d+/(append|tasks|attachments)$`), "notes:write"},

@@ -204,6 +204,7 @@ func (s *Server) Router() http.Handler {
 			r.Get("/notes/{id}/download", s.handleDownloadNote)
 
 			r.Get("/resolve", s.handleResolve)
+			r.Get("/mentions", s.handleMentions)
 			r.Get("/search", s.handleSearch)
 			r.Get("/suggest", s.handleSuggest)
 			r.Get("/folders", s.handleFolders)

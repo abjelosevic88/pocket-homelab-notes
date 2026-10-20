@@ -30,6 +30,7 @@ Add `X-Pocket-Source: shortcut` (or `app`) to have your changes named so in a no
 | `GET /search?q=` | full text, best first, `snippet` with `[[[found]]]` marks. Filters: `tag:x`, `#x`, `in:Folder`, `is:fav`, `is:pinned`, `has:tasks`, `"a phrase"` |
 | `GET /suggest?q=` | titles, for completion |
 | `GET /resolve?target=&from=` | the note a `[[link]]` or relative path means |
+| `GET /mentions?url=…[&url=…]` | notes that link to a web page (a book, an episode in another app): the same address, one below it, or with a query (`?t=95`); newest first, without content. See [notes-from-apps.md](notes-from-apps.md) |
 | `GET /folders`, `POST /folders {path}`, `PUT /folders {from, to}`, `DELETE /folders?path=` | |
 | `GET /tags`, `GET /tasks?state=open\|done\|all` | |
 

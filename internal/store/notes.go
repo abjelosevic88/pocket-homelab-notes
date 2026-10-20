@@ -789,3 +789,39 @@ func (s *Store) ChangeStamp(ctx context.Context, userID int64) string {
 	_ = s.DB.QueryRowContext(ctx, `SELECT COUNT(1), MAX(deleted_at) FROM trash WHERE user_id = ?`, userID).Scan(&t, &trashLast)
 	return strconv.Itoa(n) + "|" + last.String + "|" + strconv.Itoa(fav) + "|" + strconv.Itoa(t) + "|" + trashLast.String
 }
+
+// NotesContaining lists a person's notes whose text contains any of needles
+// (compared in lower case), with their content, newest first: the candidates
+// for notes linking to an item in another app.
+func (s *Store) NotesContaining(ctx context.Context, userID int64, needles []string, limit int) ([]Note, error) {
+	if len(needles) == 0 {
+		return []Note{}, nil
+	}
+	conds := make([]string, len(needles))
+	args := []any{userID}
+	for i, n := range needles {
+		conds[i] = "instr(lower(content), ?) > 0"
+		args = append(args, strings.ToLower(n))
+	}
+	args = append(args, limit)
+	rows, err := s.DB.QueryContext(ctx, `SELECT `+noteCols+`, content FROM notes WHERE user_id = ? AND (`+strings.Join(conds, " OR ")+`) ORDER BY modified DESC LIMIT ?`, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var ptrs []*Note
+	for rows.Next() {
+		x, err := scanNote(rows, true)
+		if err != nil {
+			return nil, err
+		}
+		ptrs = append(ptrs, x)
+	}
+	rows.Close()
+	s.attachTags(ctx, ptrs)
+	out := make([]Note, 0, len(ptrs))
+	for _, p := range ptrs {
+		out = append(out, *p)
+	}
+	return out, nil
+}

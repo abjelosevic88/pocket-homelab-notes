@@ -12,6 +12,7 @@ import Today from './pages/Today'
 import Calendar from './pages/Calendar'
 import Trash from './pages/Trash'
 import Settings from './pages/Settings'
+import NewFrom from './pages/NewFrom'
 import Share from './pages/Share'
 import { ErrorBoundary } from './components/ErrorBoundary'
 
@@ -38,6 +39,7 @@ function App() {
         <Route path="/calendar" element={<Calendar />} />
         <Route path="/trash" element={<Trash />} />
         <Route path="/settings" element={<Settings />} />
+        <Route path="/new" element={<NewFrom />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Route>
     </Routes>
