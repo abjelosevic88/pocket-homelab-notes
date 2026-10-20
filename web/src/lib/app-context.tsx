@@ -1,4 +1,4 @@
-import React, { createContext, useCallback, useContext, useEffect, useState } from 'react'
+import React, { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react'
 import { api, V1 } from './api'
 import type { Folder, Settings, SyncStatus, TagCount, Tools, User } from './types'
 
@@ -84,6 +84,28 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   }, [user, reloadTree])
 
   const bump = useCallback(() => setVersion(v => v + 1), [])
+
+  // Changes made elsewhere (the phone, Nextcloud, another tab) reach the open lists within
+  // seconds: a small stamp is asked for while the page is visible, and when it moves the lists
+  // reload. The first answer only sets where it starts.
+  const stamp = useRef('')
+  useEffect(() => {
+    if (!user) return
+    const check = async () => {
+      if (document.hidden) return
+      try {
+        const r = await api.get<{ stamp: string }>(`${V1}/changes`)
+        if (stamp.current && r.stamp !== stamp.current) bump()
+        stamp.current = r.stamp
+      } catch {}
+    }
+    check()
+    const t = setInterval(check, 10000)
+    const onShow = () => { if (!document.hidden) check() }
+    document.addEventListener('visibilitychange', onShow)
+    window.addEventListener('focus', onShow)
+    return () => { clearInterval(t); document.removeEventListener('visibilitychange', onShow); window.removeEventListener('focus', onShow) }
+  }, [user, bump])
 
   return <Ctx.Provider value={{ status, user, settings, users, folders, tags, tools, sync, version, bump, theme, toggleTheme: () => setTheme(t => t === 'dark' ? 'light' : 'dark'), refresh, reloadMeta, reloadTree, setUser, setSettings }}>{children}</Ctx.Provider>
 }

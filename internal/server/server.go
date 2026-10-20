@@ -183,6 +183,7 @@ func (s *Server) Router() http.Handler {
 			r.Put("/auth/me", s.handleUpdateMe)
 
 			r.Get("/dashboard", s.handleDashboard)
+			r.Get("/changes", s.handleChanges)
 
 			r.Get("/notes", s.handleListNotes)
 			r.Post("/notes", s.handleCreateNote)

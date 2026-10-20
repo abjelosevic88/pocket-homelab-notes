@@ -1133,3 +1133,12 @@ func (s *Server) handleDashboard(w http.ResponseWriter, r *http.Request) {
 	}
 	writeJSON(w, http.StatusOK, d)
 }
+
+// handleChanges answers a stamp that changes whenever the person's notes do,
+// here or in their folder (looked at again when the last look is older than
+// a few seconds): open pages ask it often and reload their lists when it moves.
+func (s *Server) handleChanges(w http.ResponseWriter, r *http.Request) {
+	ctx, uid := r.Context(), me(r)
+	s.fresh(ctx, uid, 8*time.Second)
+	writeJSON(w, http.StatusOK, map[string]string{"stamp": s.store.ChangeStamp(ctx, uid)})
+}

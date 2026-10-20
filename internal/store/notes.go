@@ -777,3 +777,14 @@ func (s *Store) NoteDashboard(ctx context.Context, userID int64) Dashboard {
 		day, day-6*86400, userID).Scan(&d.Notes, &d.EditedToday, &d.EditedWeek, &d.OpenTasks, &d.Favorites, &d.Folders)
 	return d
 }
+
+// ChangeStamp sums up a person's notes in one string that changes whenever a
+// note is added, changed, moved, starred or deleted.
+func (s *Store) ChangeStamp(ctx context.Context, userID int64) string {
+	var n, t int
+	var last, trashLast sql.NullString
+	var fav int
+	_ = s.DB.QueryRowContext(ctx, `SELECT COUNT(1), MAX(updated_at), COALESCE(SUM(favorite + pinned * 2), 0) FROM notes WHERE user_id = ?`, userID).Scan(&n, &last, &fav)
+	_ = s.DB.QueryRowContext(ctx, `SELECT COUNT(1), MAX(deleted_at) FROM trash WHERE user_id = ?`, userID).Scan(&t, &trashLast)
+	return strconv.Itoa(n) + "|" + last.String + "|" + strconv.Itoa(fav) + "|" + strconv.Itoa(t) + "|" + trashLast.String
+}

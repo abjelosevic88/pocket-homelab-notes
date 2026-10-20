@@ -138,7 +138,8 @@ const NoteView = forwardRef<NoteViewHandle, { id: number; onBack?: () => void; e
     return () => window.removeEventListener('beforeunload', h)
   }, [save])
 
-  // Changes made elsewhere (the phone, Nextcloud, another tab) come in while nothing is typed here.
+  // Changes made elsewhere (the phone, Nextcloud, another tab) come in while nothing is typed here;
+  // the server looks at the note's file in the storage each time (one cheap request).
   useEffect(() => {
     const look = async () => {
       const c = cur.current
@@ -151,9 +152,12 @@ const NoteView = forwardRef<NoteViewHandle, { id: number; onBack?: () => void; e
         toast('Updated with changes made elsewhere')
       } catch {}
     }
-    const t = window.setInterval(look, 20000)
-    window.addEventListener('focus', look)
-    return () => { window.clearInterval(t); window.removeEventListener('focus', look) }
+    // Every few seconds while the page is seen, and at once when it comes back into view.
+    const t = window.setInterval(look, 4000)
+    const onShow = () => { if (!document.hidden) look() }
+    window.addEventListener('focus', onShow)
+    document.addEventListener('visibilitychange', onShow)
+    return () => { window.clearInterval(t); window.removeEventListener('focus', onShow); document.removeEventListener('visibilitychange', onShow) }
   }, [toast])
 
   // ⌘S saves now.
