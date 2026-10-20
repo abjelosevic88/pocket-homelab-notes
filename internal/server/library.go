@@ -75,6 +75,11 @@ func isNoteFile(p string) bool {
 	return false
 }
 
+// inFolder reports whether p lies in folder (or below it); "" is no folder.
+func inFolder(p, folder string) bool {
+	return folder != "" && (strings.EqualFold(p, folder) || strings.HasPrefix(strings.ToLower(p), strings.ToLower(folder)+"/"))
+}
+
 func splitPath(p string) (category, title string) {
 	dir, file := path.Split(p)
 	return strings.TrimSuffix(dir, "/"), strings.TrimSuffix(file, path.Ext(file))
@@ -362,12 +367,16 @@ func (s *Server) syncLocked(ctx context.Context, l *library, force bool) (SyncSt
 	if err != nil {
 		return stats, err
 	}
+	// A .md or .txt file copied into a note (the attachments folder) is a file
+	// of that note, not a note of its own.
+	st, _ := s.store.GetSettings(ctx, l.uid)
+	attachments := notesmd.SafeFolder(st.AttachmentsFolder)
 	var files []storage.Entry
 	var dirs []string
 	for _, e := range entries {
 		if e.IsDir {
 			dirs = append(dirs, e.Path)
-		} else if isNoteFile(e.Path) {
+		} else if isNoteFile(e.Path) && !inFolder(e.Path, attachments) {
 			files = append(files, e)
 		}
 	}
@@ -529,7 +538,10 @@ func (s *Server) syncLocked(ctx context.Context, l *library, force bool) (SyncSt
 		if err != nil {
 			continue
 		}
-		_ = s.store.AddTrash(ctx, &store.TrashItem{UserID: l.uid, NoteID: n.ID, Path: n.Path, Title: n.Title, Category: n.Category, Content: n.Content, Favorite: n.Favorite, Pinned: n.Pinned, Reason: "gone"})
+		// One indexed before attachments were left out is still there: no trash.
+		if !inFolder(n.Path, attachments) {
+			_ = s.store.AddTrash(ctx, &store.TrashItem{UserID: l.uid, NoteID: n.ID, Path: n.Path, Title: n.Title, Category: n.Category, Content: n.Content, Favorite: n.Favorite, Pinned: n.Pinned, Reason: "gone"})
+		}
 		if err := s.store.DeleteNote(ctx, l.uid, n.ID); err != nil {
 			return stats, err
 		}

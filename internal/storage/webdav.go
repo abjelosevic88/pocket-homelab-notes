@@ -495,11 +495,25 @@ func (w *WebDAV) Write(ctx context.Context, p string, data []byte, ifMatch strin
 }
 
 func (w *WebDAV) Create(ctx context.Context, p string, data []byte) (Entry, error) {
+	return w.create(ctx, p, data, nil)
+}
+
+// CreateDated is Create with the modification time Nextcloud and ownCloud
+// take from X-OC-Mtime; other servers ignore it and date the file now.
+func (w *WebDAV) CreateDated(ctx context.Context, p string, data []byte, modified time.Time) (Entry, error) {
+	return w.create(ctx, p, data, map[string]string{"X-OC-Mtime": strconv.FormatInt(modified.Unix(), 10)})
+}
+
+func (w *WebDAV) create(ctx context.Context, p string, data []byte, extra map[string]string) (Entry, error) {
 	// If-None-Match is the real guard; not every server honours it, so look first.
 	if _, err := w.Stat(ctx, p); err == nil {
 		return Entry{}, ErrExists
 	}
-	err := w.put(ctx, p, data, map[string]string{"If-None-Match": "*", "Content-Type": contentType(p)})
+	hdr := map[string]string{"If-None-Match": "*", "Content-Type": contentType(p)}
+	for k, v := range extra {
+		hdr[k] = v
+	}
+	err := w.put(ctx, p, data, hdr)
 	if errors.Is(err, ErrPrecondition) {
 		return Entry{}, ErrExists
 	}

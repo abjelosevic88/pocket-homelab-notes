@@ -5,8 +5,11 @@ import (
 	"errors"
 	"net/http"
 	"net/http/httptest"
+	"os"
+	"path/filepath"
 	"sort"
 	"testing"
+	"time"
 
 	"golang.org/x/net/webdav"
 )
@@ -151,5 +154,15 @@ func TestCopy(t *testing.T) {
 	}
 	if data, _, _ := b.Read(ctx, "x (copy).md"); string(data) != "one" {
 		t.Fatalf("copy kept: %q", data)
+	}
+	// A copied note keeps the date it was last edited.
+	old := time.Date(2020, 5, 1, 12, 0, 0, 0, time.UTC)
+	_, _ = a.Create(ctx, "z.md", []byte("dated"))
+	_ = os.Chtimes(filepath.Join(a.Root, "z.md"), old, old)
+	if _, _, err := Copy(ctx, a, b, nil); err != nil {
+		t.Fatal(err)
+	}
+	if e, err := b.Stat(ctx, "z.md"); err != nil || !e.Modified.Equal(old) {
+		t.Fatalf("date not kept: %v %v", e.Modified, err)
 	}
 }

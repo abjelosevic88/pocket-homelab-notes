@@ -239,3 +239,67 @@ func TestDailyAndCapture(t *testing.T) {
 		t.Fatalf("dashboard: %+v", d)
 	}
 }
+
+// A note back from the trash keeps its id, so links to it still find it; a
+// later new note does not take the id meanwhile.
+func TestTrashRestoreKeepsID(t *testing.T) {
+	h := newHarness(t)
+	_, tok := h.user("me@example.com")
+	var n, other store.Note
+	h.do(tok, "POST", "/api/v1/notes", map[string]any{"title": "Keep", "content": "# Keep\nbody"}, &n)
+	h.do(tok, "DELETE", "/api/v1/notes/"+itoa(n.ID), nil, nil)
+	h.do(tok, "POST", "/api/v1/notes", map[string]any{"title": "Other", "content": "x"}, &other)
+	if other.ID == n.ID {
+		t.Fatalf("a new note took the trashed note's id %d", n.ID)
+	}
+	var trash []store.TrashItem
+	h.do(tok, "GET", "/api/v1/trash", nil, &trash)
+	if len(trash) != 1 {
+		t.Fatalf("trash: %+v", trash)
+	}
+	var back store.Note
+	if c := h.do(tok, "POST", "/api/v1/trash/"+itoa(trash[0].ID)+"/restore", nil, &back); c != 200 || back.ID != n.ID {
+		t.Fatalf("restore: %d id %d, want %d", c, back.ID, n.ID)
+	}
+}
+
+// A template picked in the editor comes back filled in for the note it goes into.
+func TestTemplateFilled(t *testing.T) {
+	h := newHarness(t)
+	_, tok := h.user("me@example.com")
+	var tpl store.Note
+	h.do(tok, "POST", "/api/v1/notes", map[string]any{"title": "Meeting", "category": "Templates", "content": "# {{title}}, {{iso}}\n- [ ] "}, &tpl)
+	var out struct{ Content string }
+	if c := h.do(tok, "GET", "/api/v1/templates/"+itoa(tpl.ID)+"?title=Standup", nil, &out); c != 200 {
+		t.Fatalf("template: %d", c)
+	}
+	if want := "# Standup, " + time.Now().Format("2006-01-02") + "\n- [ ] "; out.Content != want {
+		t.Fatalf("got %q, want %q", out.Content, want)
+	}
+}
+
+// A text file copied into a note's attachments is not a note of its own.
+func TestAttachmentsAreNotNotes(t *testing.T) {
+	h := newHarness(t)
+	u, tok := h.user("me@example.com")
+	var n store.Note
+	h.do(tok, "POST", "/api/v1/notes", map[string]any{"title": "Doc", "content": "x"}, &n)
+	dir := filepath.Join(h.s.builtinDir(u.ID), "attachments")
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, "plan.md"), []byte("# Plan"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	h.do(tok, "POST", "/api/v1/sync", nil, nil)
+	var list []store.Note
+	h.do(tok, "GET", "/api/v1/notes", nil, &list)
+	if len(list) != 1 || list[0].ID != n.ID {
+		t.Fatalf("notes: %+v", list)
+	}
+	var trash []store.TrashItem
+	h.do(tok, "GET", "/api/v1/trash", nil, &trash)
+	if len(trash) != 0 {
+		t.Fatalf("trash: %+v", trash)
+	}
+}

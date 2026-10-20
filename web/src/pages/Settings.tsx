@@ -122,10 +122,10 @@ function goFormat(layout: string, d: Date): string {
 }
 
 const KINDS: { kind: StorageKind; title: string; sub: string }[] = [
-  { kind: 'builtin', title: 'On this server', sub: 'A folder in Pocket Notes’ data, backed up with it.' },
+  { kind: 'builtin', title: 'In Pocket Notes', sub: 'Kept in Pocket Notes’ own data and backed up with it. Nothing to set up.' },
   { kind: 'nextcloud', title: 'Nextcloud', sub: 'A folder in your Nextcloud — the one Nextcloud Notes uses, if you like. Both see the same notes.' },
   { kind: 'webdav', title: 'WebDAV', sub: 'Any WebDAV folder: ownCloud, a NAS, Synology, Seafile…' },
-  { kind: 'folder', title: 'A folder on this server', sub: 'A folder the server shares with Pocket Notes (a NAS mount, Syncthing, Obsidian vault).' },
+  { kind: 'folder', title: 'Your own folder', sub: 'A folder the server shares with Pocket Notes (a NAS mount, Syncthing, Obsidian vault).' },
 ]
 
 function Storage() {

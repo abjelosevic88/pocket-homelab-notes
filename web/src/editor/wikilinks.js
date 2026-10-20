@@ -8,6 +8,15 @@ import { post } from './shared.js'
 
 const WIKI = /\[\[([^\[\]\n|#]+)(?:#[^\[\]\n|]*)?(?:\|([^\[\]\n]*))?\]\]/g
 
+// Milkdown writes a typed `[[Note]]` back as `\[\[Note]]` (and `my_note` inside it as
+// `my\_note`), which no notes app reads as a link. Put the brackets back as typed, outside
+// inline code; fences are skipped by the caller.
+const ESCAPED = /\\\[\\\[((?:\\.|[^\]\n])+?)\]\]/g
+export function unescapeWikiLinks(line) {
+  if (!line.includes('\\[\\[')) { return line }
+  return line.split(/(`+[^`]*`+)/).map((part, i) => (i % 2 ? part : part.replace(ESCAPED, (_, inner) => '[[' + inner.replace(/\\([!-\/:-@\[-`{-~])/g, '$1') + ']]'))).join('')
+}
+
 function decorate(doc) {
   const found = []
   doc.descendants((node, pos, parent) => {

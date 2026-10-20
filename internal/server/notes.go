@@ -772,6 +772,19 @@ func (s *Server) handleTemplates(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, notes)
 }
 
+// handleTemplate gives one template with its placeholders filled in for the
+// note it goes into (?title=), as the daily note's template is.
+func (s *Server) handleTemplate(w http.ResponseWriter, r *http.Request) {
+	ctx, uid := r.Context(), me(r)
+	n, err := s.store.GetNote(ctx, uid, idParam(r, "id"))
+	if err != nil {
+		s.fail(w, err, "template")
+		return
+	}
+	st, _ := s.store.GetSettings(ctx, uid)
+	writeJSON(w, http.StatusOK, map[string]string{"title": n.Title, "content": fillTemplate(n.Content, r.URL.Query().Get("title"), time.Now(), st)})
+}
+
 // ---- trash ----
 
 func (s *Server) handleListTrash(w http.ResponseWriter, r *http.Request) {

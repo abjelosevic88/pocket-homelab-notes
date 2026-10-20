@@ -8,6 +8,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 )
 
 // Local keeps notes in a folder on this server: the built-in place under
@@ -199,6 +200,17 @@ func (l *Local) Create(ctx context.Context, p string, data []byte) (Entry, error
 	if err := writeAtomic(a, data); err != nil {
 		os.Remove(a)
 		return Entry{}, err
+	}
+	return l.Stat(ctx, p)
+}
+
+// CreateDated is Create with the file's modification time set to modified.
+func (l *Local) CreateDated(ctx context.Context, p string, data []byte, modified time.Time) (Entry, error) {
+	if _, err := l.Create(ctx, p, data); err != nil {
+		return Entry{}, err
+	}
+	if a, err := l.abs(p); err == nil {
+		_ = os.Chtimes(a, modified, modified)
 	}
 	return l.Stat(ctx, p)
 }

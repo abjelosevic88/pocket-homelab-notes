@@ -372,12 +372,12 @@ function useMemoURL(b: Blob) {
 
 // ---------------------------------------------------------------- own templates
 
-export function TemplatePicker({ onPick, onClose }: { onPick: (md: string) => void; onClose: () => void }) {
+export function TemplatePicker({ title, onPick, onClose }: { title: string; onPick: (md: string) => void; onClose: () => void }) {
   const [list, setList] = useState<Note[] | null>(null)
   const [err, setErr] = useState('')
   useEffect(() => { api.get<Note[]>(`${V1}/templates`).then(setList).catch(e => setErr((e as Error).message)) }, [])
   const pick = async (n: Note) => {
-    const full = await api.get<Note>(`${V1}/notes/${n.id}?peek=1`)
+    const full = await api.get<{ content: string }>(`${V1}/templates/${n.id}${qs({ title })}`)
     onPick(full.content || '')
   }
   return (

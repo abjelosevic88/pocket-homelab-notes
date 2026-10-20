@@ -217,6 +217,7 @@ func (s *Server) Router() http.Handler {
 			r.Get("/calendar", s.handleCalendar)
 			r.Post("/capture", s.handleCapture)
 			r.Get("/templates", s.handleTemplates)
+			r.Get("/templates/{id}", s.handleTemplate)
 			r.Get("/today", s.handleToday)
 			r.Get("/today/agenda", s.handleTodayAgenda)
 			r.Get("/today/habits", s.handleTodayHabits)

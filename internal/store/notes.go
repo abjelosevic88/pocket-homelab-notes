@@ -174,10 +174,11 @@ func (s *Store) PathTaken(ctx context.Context, userID int64, path string) bool {
 	return n > 0
 }
 
-// InsertNote adds a note to the index. preferID (a storage file id) is used
-// as the note's id when no other note has it.
+// InsertNote adds a note to the index. preferID (a storage file id, or the id
+// a note had before it went to the trash) is used as the note's id when no
+// other note has it.
 func (s *Store) InsertNote(ctx context.Context, n *Note, preferID int64) error {
-	if preferID > 0 && preferID < LocalIDBase {
+	if preferID > 0 {
 		var taken int
 		_ = s.DB.QueryRowContext(ctx, `SELECT COUNT(1) FROM notes WHERE id = ?`, preferID).Scan(&taken)
 		if taken > 0 {

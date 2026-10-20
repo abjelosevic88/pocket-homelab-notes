@@ -10,6 +10,7 @@ import { MarkdownEditor, type MarkdownEditorHandle } from './MarkdownEditor'
 import { BookmarkSheet, DiagramViewer, ExpenseSheet, FilesPicker, HabitsSheet, LinkPicker, PhotoPicker, TaskSheet, TemplatePicker, VoiceMemo, toolError } from './Tools'
 import { HistoryModal, MoveModal, ShareModal } from './NoteDialogs'
 import { exportHTML, printNote } from '../lib/export'
+import { copyText } from '../lib/clipboard'
 
 type Status = 'saved' | 'dirty' | 'saving' | 'error' | 'conflict' | 'offline'
 type Sheet =
@@ -310,7 +311,7 @@ const NoteView = forwardRef<NoteViewHandle, { id: number; onBack?: () => void; e
       case 'share': doExport(m.kind === 'html' ? 'html' : 'pdf'); break
       case 'link': openLink(String(m.url), String(m.raw ?? m.url)); break
       case 'diagram': setSheet({ kind: 'diagram', svg: String(m.svg) }); break
-      case 'code': navigator.clipboard?.writeText(String(m.code ?? '')); toast('Command copied'); break
+      case 'code': copyText(String(m.code ?? '')).then(ok => toast(ok ? 'Command copied' : 'Could not copy the command', ok ? 'ok' : 'err')); break
     }
   }
 
@@ -389,7 +390,7 @@ const NoteView = forwardRef<NoteViewHandle, { id: number; onBack?: () => void; e
               <button onClick={() => setSheet({ kind: 'move' })}>Move to…</button>
               <button onClick={async () => { const n = await api.post<Note>(`${V1}/notes/${note.id}/duplicate`); bump(); navigate(`/note/${n.id}${location.search}`) }}>Duplicate</button>
               <hr />
-              <button onClick={() => { navigator.clipboard?.writeText(noteURL(note.id)); toast('Link copied') }}>Copy link</button>
+              <button onClick={async () => { const ok = await copyText(noteURL(note.id)); toast(ok ? 'Link copied' : 'Could not copy the link', ok ? 'ok' : 'err') }}>Copy link</button>
               <a href={`${V1}/notes/${note.id}/download`}>Download .md</a>
               <button onClick={() => doExport('pdf')}>Print / PDF</button>
               <button onClick={() => doExport('html')}>Export HTML</button>
@@ -451,7 +452,7 @@ const NoteView = forwardRef<NoteViewHandle, { id: number; onBack?: () => void; e
       {sheet?.kind === 'expense' && <ExpenseSheet line={sheet.line?.text || ''} onClose={() => setSheet(null)} onDone={m => { const l = sheet.line; setSheet(null); replaceLine(l, m); toast('Booked') }} />}
       {sheet?.kind === 'habits' && <HabitsSheet onClose={() => setSheet(null)} onDone={m => { setSheet(null); put(m, 'block') }} />}
       {sheet?.kind === 'voice' && <VoiceMemo upload={async f => (await uploadFiles([f]))[0] || ''} onClose={() => setSheet(null)} onDone={m => { setSheet(null); put(m, 'block') }} />}
-      {sheet?.kind === 'templates' && <TemplatePicker onClose={() => setSheet(null)} onPick={m => { setSheet(null); if (mode === 'rich') rich.current?.insertTemplate(m); else put(m, 'block') }} />}
+      {sheet?.kind === 'templates' && <TemplatePicker title={note.title} onClose={() => setSheet(null)} onPick={m => { setSheet(null); if (mode === 'rich') rich.current?.insertTemplate(m); else put(m, 'block') }} />}
       {sheet?.kind === 'diagram' && <DiagramViewer svg={sheet.svg} onClose={() => setSheet(null)} />}
       {sheet?.kind === 'history' && <HistoryModal note={note} onClose={() => setSheet(null)} onRestored={n => { const c = cur.current; c.etag = n.etag; c.saved = n.content || ''; c.draft = c.saved; setNote(n); setDraft(c.saved); setRevision(r => r + 1); setSheet(null); toast('Restored') }} />}
       {sheet?.kind === 'share' && <ShareModal note={note} onClose={() => setSheet(null)} />}

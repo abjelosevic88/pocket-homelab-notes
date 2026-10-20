@@ -9,6 +9,7 @@ import (
 	"errors"
 	"net/url"
 	"path"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -68,6 +69,12 @@ type Backend interface {
 // root changed (Nextcloud propagates ETags upwards).
 type RootTagger interface {
 	RootETag(ctx context.Context) (string, error)
+}
+
+// Dater is a backend that can make a file with a given modification time, so
+// notes copied to it keep their "edited" dates.
+type Dater interface {
+	CreateDated(ctx context.Context, p string, data []byte, modified time.Time) (Entry, error)
 }
 
 // Favoriter is a backend that keeps a favourite mark on files (Nextcloud).
@@ -181,20 +188,40 @@ func Copy(ctx context.Context, from, to Backend, progress func(done, total int))
 		if err != nil {
 			return copied, renamed, err
 		}
-		_, err = to.Create(ctx, e.Path, data)
-		if errors.Is(err, ErrExists) {
-			old, _, rerr := to.Read(ctx, e.Path)
-			if rerr == nil && string(old) == string(data) {
-				continue
+		create := func(p string) (Entry, error) {
+			if d, ok := to.(Dater); ok && !e.Modified.IsZero() {
+				return d.CreateDated(ctx, p, data, e.Modified)
 			}
-			ext := path.Ext(e.Path)
-			alt := strings.TrimSuffix(e.Path, ext) + " (copy)" + ext
-			if _, err = to.Create(ctx, alt, data); err == nil {
-				renamed++
+			return to.Create(ctx, p, data)
+		}
+		// A name already taken there: the same file is left alone, a different
+		// one is kept beside it as "name (copy).md", "name (copy 2).md"…
+		same, kept := false, false
+		ext := path.Ext(e.Path)
+		for i := 0; i < 50; i++ {
+			p := e.Path
+			if i == 1 {
+				p = strings.TrimSuffix(e.Path, ext) + " (copy)" + ext
+			} else if i > 1 {
+				p = strings.TrimSuffix(e.Path, ext) + " (copy " + strconv.Itoa(i) + ")" + ext
+			}
+			if _, err = create(p); !errors.Is(err, ErrExists) {
+				kept = i > 0
+				break
+			}
+			if old, _, rerr := to.Read(ctx, p); rerr == nil && string(old) == string(data) {
+				same, err = true, nil
+				break
 			}
 		}
 		if err != nil {
 			return copied, renamed, err
+		}
+		if same {
+			continue
+		}
+		if kept {
+			renamed++
 		}
 		copied++
 	}

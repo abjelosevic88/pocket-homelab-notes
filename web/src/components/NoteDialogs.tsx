@@ -3,6 +3,7 @@ import { api, V1 } from '../lib/api'
 import { useApp } from '../lib/app-context'
 import type { DiffOp, Note, Share, Version } from '../lib/types'
 import { ago, stamp } from '../lib/format'
+import { copyText } from '../lib/clipboard'
 import { Confirm, Loading, Modal, Segmented, useToast } from './ui'
 
 const SOURCES: Record<string, string> = { web: 'Here', api: 'API', 'nextcloud-api': 'Nextcloud Notes app', sync: 'Changed in the folder', restore: 'Restored', import: 'First seen', capture: 'Quick capture', daily: 'Daily note', app: 'Pocket Homelab app', shortcut: 'Shortcut' }
@@ -62,7 +63,7 @@ export function ShareModal({ note, onClose }: { note: Note; onClose: () => void 
   const url = (s: Share) => `${location.origin}/s/${s.token}`
   const make = async () => {
     const s = await api.post<Share>(`${V1}/notes/${note.id}/shares`, { days })
-    navigator.clipboard?.writeText(url(s)); toast('Link made and copied'); load()
+    load(); toast(await copyText(url(s)) ? 'Link made and copied' : 'Link made — copy it from the list')
   }
   return (
     <Modal title="Share a link" onClose={onClose}>
@@ -77,7 +78,7 @@ export function ShareModal({ note, onClose }: { note: Note; onClose: () => void 
             <tr key={s.id}>
               <td><code className="mono small">{url(s)}</code><div className="muted small">{s.views} view{s.views === 1 ? '' : 's'} · {s.expires_at ? `until ${stamp(s.expires_at)}` : 'no end'}</div></td>
               <td className="right"><span className="row" style={{ justifyContent: 'flex-end' }}>
-                <button className="btn ghost sm" onClick={() => { navigator.clipboard?.writeText(url(s)); toast('Copied') }}>Copy</button>
+                <button className="btn ghost sm" onClick={async () => { const ok = await copyText(url(s)); toast(ok ? 'Copied' : 'Could not copy — select the link instead', ok ? 'ok' : 'err') }}>Copy</button>
                 <a className="btn ghost sm" href={url(s)} target="_blank" rel="noreferrer">Open</a>
                 <button className="btn ghost sm danger-text" onClick={async () => { await api.del(`${V1}/shares/${s.id}`); load() }}>Revoke</button>
               </span></td>
