@@ -178,6 +178,7 @@ func (p *oidcProvider) key(ctx context.Context, jwksURL, kid string) (*rsa.Publi
 type idClaims struct {
 	Iss           string          `json:"iss"`
 	Sub           string          `json:"sub"`
+	AuthRevision  int64           `json:"auth_revision"`
 	Aud           json.RawMessage `json:"aud"`
 	Exp           int64           `json:"exp"`
 	Nonce         string          `json:"nonce"`
@@ -400,21 +401,19 @@ func (s *Server) handleOIDCCallback(w http.ResponseWriter, r *http.Request) {
 		fail("Your "+name+" account needs a verified email address", nil)
 		return
 	}
-	u, err := s.store.GetUserByEmail(ctx, email)
+	u, err := s.identityUser(ctx, claims.Iss, claims.Sub, email, claims.Name, (s.cfg.OIDCAutoCreate || s.oidcFromCore()))
 	if err != nil {
-		// Core vouched for the person; an env-configured provider honours OIDC_AUTO_CREATE.
-		if !s.oidcFromCore() && !s.cfg.OIDCAutoCreate {
-			fail("No Pocket Notes account for "+email+" — ask the admin to add you under Settings → Users", nil)
-			return
-		}
-		if u, err = s.firstOrSystemUser(ctx, email, claims.Name); err != nil {
-			fail("Could not create your account", err)
-			return
-		}
+		fail("No Pocket Notes account for "+email+" or identity could not be linked", err)
+		return
 	}
 	id, err := s.store.CreateSession(ctx, u.ID, s.cfg.SessionTTL)
 	if err != nil {
 		fail("Could not start a session", err)
+		return
+	}
+	if err := s.core.TrackSession(ctx, id, claims.Iss, claims.Sub, claims.AuthRevision); err != nil {
+		_ = s.store.DeleteSession(ctx, id)
+		fail("Could not start a revocable session", err)
 		return
 	}
 	s.setSessionCookie(w, id, s.cfg.SessionTTL)

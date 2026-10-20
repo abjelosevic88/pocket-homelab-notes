@@ -35,6 +35,9 @@ func newHarness(t *testing.T) *harness {
 	}
 	t.Cleanup(func() { st.Close() })
 	s := New(cfg, st, log, nil)
+	if err := s.core.Start(t.Context()); err != nil {
+		t.Fatal(err)
+	}
 	ts := httptest.NewServer(s.Router())
 	t.Cleanup(ts.Close)
 	return &harness{t: t, s: s, st: st, ts: ts, dir: dir}

@@ -41,6 +41,7 @@ var serviceUses = []core.ServiceUse{
 
 // serviceNames are the names people see.
 var serviceNames = map[string]string{
+	"tasks":     "Pocket Tasks",
 	"nextcloud": "Nextcloud", "immich": "Immich", "forgejo": "Forgejo", "jellyfin": "Jellyfin",
 	"jellystat": "Jellystat", "audiobookshelf": "Audiobookshelf", "kuma": "Uptime Kuma", "scrutiny": "Scrutiny", "backrest": "Backrest",
 	"adguard": "AdGuard Home", "glances": "Glances", "beszel": "Beszel",
@@ -50,6 +51,7 @@ var serviceNames = map[string]string{
 // directFields says what a typed-in connection asks for: the key's label and
 // whether a username goes with it ("" = no key at all).
 var directFields = map[string][2]string{
+	"tasks":     {"API token", ""},
 	"nextcloud": {"App password", "Username"}, "immich": {"API key", ""}, "forgejo": {"Token", ""},
 	"jellyfin": {"API key", "User id (optional)"}, "jellystat": {"API key", ""}, "audiobookshelf": {"Token", ""},
 	"kuma": {"API key (optional)", "Status page slug"}, "scrutiny": {"", ""}, "backrest": {"Password", "Username"}, "adguard": {"Password", "Username"},

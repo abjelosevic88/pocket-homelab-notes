@@ -359,6 +359,10 @@ func actDefaultDestination(lists []actTaskList, boards []actDeckBoard) string {
 // Only lists and boards the person can write to are listed. A service that
 // fails leaves its array empty and says why under "errors".
 func (s *Server) handleToolTaskTargets(w http.ResponseWriter, r *http.Request) {
+	if r.URL.Query().Get("destination") == "pocket-tasks" {
+		s.pocketTaskTargets(w, r)
+		return
+	}
 	ctx, uid := r.Context(), me(r)
 	c, err := s.service(ctx, uid, "nextcloud")
 	if err != nil {
@@ -427,8 +431,8 @@ func (s *Server) handleToolTask(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, http.StatusBadRequest, "Write the line first, then make it a task.")
 		return
 	}
-	if in.Destination != "" && in.Destination != "tasks" && in.Destination != "deck" {
-		writeErr(w, http.StatusBadRequest, "destination must be tasks or deck")
+	if in.Destination != "" && in.Destination != "tasks" && in.Destination != "deck" && in.Destination != "pocket-tasks" {
+		writeErr(w, http.StatusBadRequest, "destination must be tasks, deck or pocket-tasks")
 		return
 	}
 	now := time.Now()
@@ -443,6 +447,10 @@ func (s *Server) handleToolTask(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		due = d
+	}
+	if in.Destination == "pocket-tasks" {
+		s.createPocketTask(w, r, title, firstNonEmpty(in.Line, text), in.List, due)
+		return
 	}
 	c, err := s.service(ctx, uid, "nextcloud")
 	if err != nil {

@@ -60,7 +60,7 @@ func New(cfg *config.Config, st *store.Store, log *slog.Logger, webFS fs.FS) *Se
 	ua := "PocketNotes/" + Version + " (+https://github.com/abjelosevic88/pocket-homelab-notes)"
 	s := &Server{cfg: cfg, store: st, log: log, webFS: webFS, started: time.Now(), libs: map[int64]*library{}}
 	s.http = &http.Client{Timeout: 30 * time.Second}
-	s.core = core.New(cfg.CoreURL, core.Options{TokenFile: cfg.DataDir + "/core.token", UserAgent: ua, ServiceCache: time.Minute, ServiceStale: 15 * time.Minute})
+	s.core = core.New(cfg.CoreURL, core.Options{DB: st.DB, TokenFile: cfg.DataDir + "/core.token", UserAgent: ua, ServiceCache: time.Minute, ServiceStale: 15 * time.Minute})
 	s.oidc = &oidcProvider{issuerURL: cfg.OIDCIssuer}
 	return s
 }
@@ -73,6 +73,9 @@ func (s *Server) isOwner(ctx context.Context, uid int64) bool {
 
 // Bootstrap seeds the first admin (if configured), demo data and starts the workers.
 func (s *Server) Bootstrap(ctx context.Context) error {
+	if err := s.core.Start(ctx); err != nil {
+		return err
+	}
 	if err := os.MkdirAll(filepath.Join(s.cfg.DataDir, "notes"), 0o755); err != nil {
 		return fmt.Errorf("create notes dir: %w", err)
 	}
@@ -411,23 +414,21 @@ func (s *Server) registerWithCore(ctx context.Context) error {
 	return nil
 }
 
-// publish sends an event to Core without blocking the request. The payload
+// publish persists an event locally; the SDK retries network delivery. The payload
 // names whose note it was (user_id, user_email).
 func (s *Server) publish(userID int64, topic, subject string, payload map[string]any) {
 	if !s.core.Configured() {
 		return
 	}
-	go func() {
-		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-		defer cancel()
-		payload["user_id"] = userID
-		if u, err := s.store.GetUser(ctx, userID); err == nil {
-			payload["user_email"] = u.Email
-		}
-		if err := s.core.Publish(ctx, topic, subject, payload); err != nil {
-			s.log.Warn("pocket core: publish failed", "topic", topic, "err", err)
-		}
-	}()
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	payload["user_id"] = userID
+	if u, err := s.store.GetUser(ctx, userID); err == nil {
+		payload["user_email"] = u.Email
+	}
+	if err := s.core.Publish(ctx, topic, subject, payload); err != nil {
+		s.log.Warn("pocket core: outbox enqueue failed", "topic", topic, "err", err)
+	}
 }
 
 // coreStatus summarises the Pocket Core link for the About page.
@@ -458,7 +459,7 @@ func (s *Server) handleClientError(w http.ResponseWriter, r *http.Request) {
 // ---------- health / metrics ----------
 
 func (s *Server) handleHealth(w http.ResponseWriter, r *http.Request) {
-	writeJSON(w, http.StatusOK, map[string]any{"status": "ok", "version": Version, "uptime": time.Since(s.started).Round(time.Second).String()})
+	writeJSON(w, http.StatusOK, map[string]any{"core_outbox": s.coreOutboxHealth(r.Context()), "status": "ok", "version": Version, "uptime": time.Since(s.started).Round(time.Second).String()})
 }
 
 func (s *Server) handleReady(w http.ResponseWriter, r *http.Request) {

@@ -22,6 +22,7 @@ var linkOffers = []core.Offer{
 
 // linkUses are the Pocket apps whose data the editor's homelab tools put into a note.
 var linkUses = []core.Use{
+	{App: "tasks", Scopes: []string{"tasks:read", "tasks:write"}, Reason: "Turn a line of a note into a Pocket Tasks task"},
 	{App: "habits", Scopes: []string{"habits:read", "entries:write"}, Reason: "Days of habits written into a note, and today's habits ticked on the Today page"},
 	{App: "money", Scopes: []string{"transactions:read", "transactions:write"}, Reason: "Spending this month in a note, and a line of a note made a transaction"},
 	{App: "garage", Scopes: []string{"vehicles:read"}, Reason: "The vehicle log (fill-ups, services) written into a note"},
@@ -76,7 +77,7 @@ func (s *Server) linkUser(ctx context.Context, tok string, r *http.Request) (*st
 	if !linkAllows(strings.Fields(in.Scope), r) {
 		return nil, errLinkScope
 	}
-	return s.firstOrSystemUser(ctx, strings.ToLower(in.User.Email), in.User.Name)
+	return s.coreIdentityUser(ctx, in)
 }
 
 // reportModes tells Core how each person is connected to the services and
