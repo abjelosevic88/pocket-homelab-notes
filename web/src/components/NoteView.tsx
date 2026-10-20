@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { forwardRef, useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { api, ApiError, upload, V1, qs } from '../lib/api'
 import { useApp } from '../lib/app-context'
@@ -27,7 +27,10 @@ const noteIdIn = (url: string): number | null => {
   return m ? Number(m[1]) : null
 }
 
-export default function NoteView({ id, onBack }: { id: number; onBack?: () => void }) {
+/** What a page around a note may ask of it: save what is typed now, read it again. */
+export interface NoteViewHandle { saveNow(): Promise<void>; reload(): Promise<void> }
+
+const NoteView = forwardRef<NoteViewHandle, { id: number; onBack?: () => void; embedded?: boolean }>(function NoteView({ id, onBack, embedded }, ref) {
   const { settings, tools, theme, bump } = useApp()
   const { toast } = useToast()
   const navigate = useNavigate()
@@ -161,6 +164,22 @@ export default function NoteView({ id, onBack }: { id: number; onBack?: () => vo
     window.addEventListener('keydown', h)
     return () => window.removeEventListener('keydown', h)
   }, [save, changed])
+
+  useImperativeHandle(ref, () => ({
+    saveNow: async () => {
+      const p = rich.current?.flush()
+      if (p != null) changed(p)
+      await save()
+    },
+    reload: async () => {
+      const c = cur.current
+      if (!c.id || c.draft !== c.saved) return
+      const n = await api.get<Note>(`${V1}/notes/${c.id}?peek=1`)
+      if (cur.current !== c || c.draft !== c.saved || n.etag === c.etag) return
+      c.etag = n.etag; c.saved = n.content || ''; c.draft = c.saved
+      setNote(n); setTitle(n.title); setDraft(c.saved); setRevision(r => r + 1)
+    },
+  }), [changed, save])
 
   const patch = async (body: Record<string, unknown>, msg?: string) => {
     if (!note) return
@@ -340,7 +359,7 @@ export default function NoteView({ id, onBack }: { id: number; onBack?: () => vo
   const statusText: Record<Status, string> = { saved: 'Saved', dirty: 'Editing…', saving: 'Saving…', error: 'Not saved — retrying', conflict: 'Changed elsewhere', offline: 'Offline — retrying' }
 
   return (
-    <div className={`note-view ${panel ? 'with-panel' : ''}`}>
+    <div className={`note-view ${panel ? 'with-panel' : ''} ${embedded ? 'embedded' : ''}`}>
       <header className="note-head">
         {onBack && <button className="btn ghost icon back-btn" onClick={onBack} aria-label="Back">←</button>}
         <div className="note-title-wrap">
@@ -436,7 +455,9 @@ export default function NoteView({ id, onBack }: { id: number; onBack?: () => vo
       {sheet?.kind === 'delete' && <Confirm title={`Delete “${note.title}”?`} message={<>It goes to the trash (Trash in the sidebar) for {settings?.trash_days ?? 30} days{settings?.storage_kind === 'nextcloud' ? ', and to Nextcloud’s own trash bin' : ''}.</>} onCancel={() => setSheet(null)} onConfirm={async () => { setSheet(null); cur.current.draft = cur.current.saved; await api.del(`${V1}/notes/${note.id}`); bump(); toast('Moved to the trash'); navigate(`/${location.search}`) }} />}
     </div>
   )
-}
+})
+
+export default NoteView
 
 function MdToolbar({ ed, onTool, onAttach, onTemplates, tools }: { ed: React.RefObject<MarkdownEditorHandle | null>; onTool: (t: string) => void; onAttach: (s: string) => void; onTemplates: () => void; tools: string[] }) {
   const [open, setOpen] = useState(false)

@@ -29,7 +29,7 @@ export function QuickSwitcher({ onClose, onNew, onToday }: { onClose: () => void
   type Row = { key: string; run: () => void; title: string; sub?: React.ReactNode; ico: string }
   const commands: Row[] = [
     { key: 'cmd-new', run: onNew, title: 'New note', ico: '＋' },
-    { key: 'cmd-today', run: onToday, title: 'Today’s daily note', ico: '☀' },
+    { key: 'cmd-today', run: onToday, title: 'Today', ico: '☀' },
     { key: 'cmd-tasks', run: () => { onClose(); navigate('/tasks') }, title: 'Tasks', ico: '☑' },
     { key: 'cmd-search', run: () => { onClose(); navigate(`/?q=${encodeURIComponent(q)}`) }, title: q.trim() ? `Search everything for “${q.trim()}”` : 'Search everything', ico: '⌕' },
   ].filter(c => !q.trim() || c.title.toLowerCase().includes(q.trim().toLowerCase()) || c.key === 'cmd-search')

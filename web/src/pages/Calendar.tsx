@@ -17,16 +17,13 @@ export default function Calendar() {
   const start = (month.getDay() + 6) % 7 // weeks start on Monday
   const days = new Date(month.getFullYear(), month.getMonth() + 1, 0).getDate()
   const cells: (Date | null)[] = [...Array(start).fill(null), ...Array.from({ length: days }, (_, i) => new Date(month.getFullYear(), month.getMonth(), i + 1))]
-  const open = async (d: Date) => {
-    const day = isoDay(d), info = data?.days[day]
-    if (info?.daily) { navigate(`/note/${info.daily}?in=${encodeURIComponent(settings?.daily_folder || '')}`); return }
-    try { const r = await api.post<{ note: Note }>(`${V1}/daily`, { date: day }); bump(); navigate(`/note/${r.note.id}?in=${encodeURIComponent(r.note.category)}`) } catch (e) { toast((e as Error).message, 'err') }
-  }
+  // A day opens on the Today page, which offers to start its note when there is none.
+  const open = (d: Date) => navigate(isoDay(d) === today() ? '/today' : `/today?date=${isoDay(d)}`)
   const max = Math.max(1, ...Object.values(data?.days || {}).map(d => d.edited))
   const now = today()
   return (
     <div className="page">
-      <PageHeader title="Calendar" sub={`Daily notes live in “${settings?.daily_folder || 'Daily'}”. A day without one makes it from your template.`} actions={<div className="row">
+      <PageHeader title="Calendar" sub={`Daily notes live in “${settings?.daily_folder || 'Daily'}”. Pick a day to open it.`} actions={<div className="row">
         <button className="btn sm" onClick={() => setMonth(m => new Date(m.getFullYear(), m.getMonth() - 1, 1))}>‹</button>
         <b style={{ minWidth: 150, textAlign: 'center' }}>{month.toLocaleDateString(undefined, { month: 'long', year: 'numeric' })}</b>
         <button className="btn sm" onClick={() => setMonth(m => new Date(m.getFullYear(), m.getMonth() + 1, 1))}>›</button>

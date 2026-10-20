@@ -74,9 +74,7 @@ export default function Layout() {
 
   const logout = async () => { await api.post(`${V1}/auth/logout`); setUser(null); navigate('/login') }
   const newNote = () => newNoteIn(here ?? settings?.default_folder ?? '', navigate, bump, toast)
-  const openToday = async () => {
-    try { const r = await api.post<{ note: Note }>(`${V1}/daily`, {}); bump(); navigate(`/note/${r.note.id}?in=${encodeURIComponent(r.note.category)}`) } catch (e) { toast((e as Error).message, 'err') }
-  }
+  const openToday = () => navigate('/today')
   const doCapture = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!capture.trim()) return
@@ -106,7 +104,7 @@ export default function Layout() {
         </div>
         <form className="capture" onSubmit={doCapture}><input value={capture} onChange={e => setCapture(e.target.value)} placeholder="Capture to today…" aria-label="Quick capture to today's note" /></form>
         <nav className="side-nav">
-          <button className="nav-item" onClick={openToday} title="Today's daily note (⌘⇧D)"><span className="ico">☀</span>Today</button>
+          <NavLink to="/today" className="nav-item" title="Today (⌘⇧D)"><span className="ico">☀</span>Today</NavLink>
           <NavLink to="/" end className={() => `nav-item ${loc.pathname === '/' || loc.pathname.startsWith('/note/') ? (!params.toString() ? 'active' : '') : ''}`}><span className="ico">▤</span>All notes</NavLink>
           <NavLink to="/?view=recent" className={() => `nav-item ${params.get('view') === 'recent' ? 'active' : ''}`}><span className="ico">↺</span>Recent</NavLink>
           <NavLink to="/?view=favorites" className={() => `nav-item ${params.get('view') === 'favorites' ? 'active' : ''}`}><span className="ico">★</span>Favourites</NavLink>

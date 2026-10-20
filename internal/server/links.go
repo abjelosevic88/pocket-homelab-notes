@@ -22,7 +22,7 @@ var linkOffers = []core.Offer{
 
 // linkUses are the Pocket apps whose data the editor's homelab tools put into a note.
 var linkUses = []core.Use{
-	{App: "habits", Scopes: []string{"habits:read"}, Reason: "Days of habits: the habits done and missed, written into a note"},
+	{App: "habits", Scopes: []string{"habits:read", "entries:write"}, Reason: "Days of habits written into a note, and today's habits ticked on the Today page"},
 	{App: "money", Scopes: []string{"transactions:read", "transactions:write"}, Reason: "Spending this month in a note, and a line of a note made a transaction"},
 	{App: "garage", Scopes: []string{"vehicles:read"}, Reason: "The vehicle log (fill-ups, services) written into a note"},
 	{App: "podcasts", Scopes: []string{"history:read"}, Reason: "What you listened to this week, written into a note"},

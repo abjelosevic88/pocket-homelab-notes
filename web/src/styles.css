@@ -404,3 +404,82 @@ select.xs { width: auto; padding: 2px 6px; font-size: 12px; border-radius: 6px; 
 .note-row .row { min-width: 0; }
 .crash { max-width: 560px; margin: 12vh auto; padding: 24px; display: grid; gap: 12px; }
 .crash pre { white-space: pre-wrap; }
+
+/* ---- Today ---- */
+.today.page > * { max-width: 1320px; }
+.today-head { display: flex; align-items: flex-end; gap: 20px; margin-bottom: 14px; flex-wrap: wrap; }
+.today-kicker { color: var(--accent-hover); font-weight: 600; font-size: 13px; letter-spacing: .02em; }
+.today-head h1 { font-size: 34px; letter-spacing: -.02em; line-height: 1.1; margin-top: 2px; }
+.today-date { color: var(--muted); font-size: 15px; }
+.weather { display: flex; align-items: center; gap: 10px; padding: 8px 14px; border-radius: 14px; background: var(--surface); border: 1px solid var(--border); line-height: 1.25; }
+.weather .sky { font-size: 30px; }
+.today-nav { gap: 4px; }
+.week-strip { display: flex; gap: 6px; margin-bottom: 18px; overflow-x: auto; }
+.wday { flex: 1; min-width: 54px; display: grid; justify-items: center; gap: 1px; padding: 7px 4px 6px; border-radius: 12px; border: 1px solid var(--border); background: var(--surface); color: var(--text); cursor: pointer; font: inherit; }
+.wday:hover { border-color: var(--accent); text-decoration: none; }
+.wday small { color: var(--muted); font-size: 11px; text-transform: uppercase; letter-spacing: .04em; }
+.wday b { font-size: 17px; }
+.wday.now b { color: var(--accent-hover); }
+.wday.sel { background: var(--accent); border-color: var(--accent); }
+.wday.sel small, .wday.sel b { color: #fff; }
+[data-theme="dark"] .wday.sel small, [data-theme="dark"] .wday.sel b { color: #1c1b17; }
+.wday .marks { display: flex; gap: 3px; height: 6px; }
+.wday .dot { width: 6px; height: 6px; border-radius: 50%; display: block; }
+.wday .dot.daily { background: var(--accent); } .wday .dot.edit { background: var(--muted); opacity: .5; }
+.wday.sel .dot { background: #fff; }
+.wday.cal-link { flex: 0 0 44px; min-width: 44px; align-content: center; font-size: 18px; color: var(--muted); }
+.today-grid { display: grid; grid-template-columns: minmax(0, 1.65fr) minmax(300px, 1fr); gap: 18px; align-items: start; }
+.today-main { background: var(--surface); border: 1px solid var(--border); border-radius: 16px; box-shadow: var(--shadow); overflow: hidden; }
+.capture-big { display: flex; align-items: center; gap: 10px; padding: 12px 14px; border-bottom: 1px solid var(--border); background: var(--surface-2); }
+.capture-big .stamp { font-family: var(--mono); font-size: 12px; color: var(--accent-hover); background: var(--accent-soft); padding: 3px 8px; border-radius: 999px; }
+.capture-big input { border: 0; background: transparent; box-shadow: none !important; font-size: 15px; padding: 6px 0; }
+.today-note { height: max(520px, calc(100vh - 300px)); }
+.today-note .note-view.embedded .note-head { padding-top: 8px; }
+.today-empty { padding: 56px 24px; text-align: center; display: grid; gap: 8px; justify-items: center; }
+.today-empty .big { font-size: 44px; }
+.today-side { display: grid; gap: 14px; }
+.tcard { background: var(--surface); border: 1px solid var(--border); border-radius: 14px; padding: 12px 14px; box-shadow: var(--shadow); }
+.tcard-head { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
+.tcard-head h3 { flex: 1; font-size: 14px; }
+.agenda { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+.agenda li { display: flex; gap: 10px; align-items: stretch; padding: 6px 4px; border-radius: 8px; }
+.agenda li.past { opacity: .5; }
+.agenda li.live { background: var(--accent-soft); }
+.agenda .bar { width: 4px; border-radius: 4px; flex-shrink: 0; }
+.agenda .when { width: 54px; flex-shrink: 0; font-variant-numeric: tabular-nums; font-size: 13px; }
+.agenda .grow { display: grid; } .agenda small { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.habit-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.habit { display: inline-flex; align-items: center; gap: 6px; padding: 5px 10px 5px 5px; border-radius: 999px; border: 1px solid var(--border); background: var(--surface); color: var(--text); cursor: pointer; font: inherit; font-size: 13px; }
+.habit .tick { width: 20px; height: 20px; border-radius: 50%; border: 2px solid var(--hc); display: grid; place-items: center; font-size: 12px; color: #fff; }
+.habit.done { border-color: var(--hc); background: color-mix(in srgb, var(--hc) 14%, transparent); }
+.habit.done .tick { background: var(--hc); }
+.habit.missed .tick { background: var(--muted); border-color: var(--muted); }
+.habit small { color: var(--muted); }
+.tgroup + .tgroup { margin-top: 8px; }
+.tgroup-title { font-size: 11px; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); font-weight: 650; margin-bottom: 2px; }
+.tgroup.overdue .tgroup-title { color: var(--danger); }
+.ttasks { list-style: none; margin: 0; padding: 0; }
+.ttasks li { display: flex; gap: 8px; align-items: flex-start; padding: 4px 0; }
+.ttasks input { width: 15px; height: 15px; margin-top: 3px; accent-color: var(--accent); flex-shrink: 0; }
+.ttasks .from { display: block; font-size: 11.5px; color: var(--muted); }
+.mini-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 2px; }
+.link-btn.mini { display: grid; width: 100%; padding: 6px 6px; border-radius: 8px; }
+.link-btn.mini:hover { background: var(--surface-2); }
+.link-btn.mini:hover b { text-decoration: none; }
+.clamp { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.new-pill { margin-left: 6px; font-size: 10px; text-transform: uppercase; background: var(--accent-soft); color: var(--accent-hover); padding: 1px 6px; border-radius: 999px; vertical-align: 2px; }
+@media (max-width: 1000px) {
+  .today-grid { grid-template-columns: 1fr; }
+  .today-note { height: 70vh; }
+}
+@media (max-width: 760px) {
+  .today-head h1 { font-size: 28px; }
+  .wday { min-width: 44px; }
+}
+@media (max-width: 760px) {
+  .today-head { gap: 10px; align-items: center; }
+  .today-head > .grow { flex: 1 1 100%; }
+  .weather { padding: 6px 10px; }
+  .weather .sky { font-size: 22px; }
+  .today-nav { margin-left: auto; }
+}

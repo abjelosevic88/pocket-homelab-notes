@@ -8,6 +8,7 @@ import Layout from './components/Layout'
 import Login from './pages/Login'
 import Notes from './pages/Notes'
 import Tasks from './pages/Tasks'
+import Today from './pages/Today'
 import Calendar from './pages/Calendar'
 import Trash from './pages/Trash'
 import Settings from './pages/Settings'
@@ -32,6 +33,7 @@ function App() {
       <Route element={<Gate><Layout /></Gate>}>
         <Route path="/" element={<Notes />} />
         <Route path="/note/:id" element={<Notes />} />
+        <Route path="/today" element={<Today />} />
         <Route path="/tasks" element={<Tasks />} />
         <Route path="/calendar" element={<Calendar />} />
         <Route path="/trash" element={<Trash />} />
