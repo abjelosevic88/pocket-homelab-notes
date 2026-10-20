@@ -1,0 +1,5 @@
+# Caddy: TLS + reverse proxy. Public feeds live under /feed/<key>/…, so the
+# whole site can stay private (VPN, auth proxy) while /feed/* is published.
+podcasts.example.com {
+	reverse_proxy 127.0.0.1:8080
+}

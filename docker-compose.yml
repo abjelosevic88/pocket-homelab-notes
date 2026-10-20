@@ -1,0 +1,21 @@
+services:
+  pocket-notes:
+    image: ghcr.io/abjelosevic88/pocket-homelab-notes:latest
+    container_name: pocket-notes
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    environment:
+      TZ: ${TZ:-UTC}
+      BASE_URL: ${BASE_URL:-}
+      # Set both to skip the first-run setup screen and create the admin directly:
+      # ADMIN_EMAIL: ${ADMIN_EMAIL}
+      # ADMIN_PASSWORD: ${ADMIN_PASSWORD}
+      # SECURE_COOKIES: "true"          # behind HTTPS
+      # AUTH_MODE: proxy                # trust Remote-User from Authelia / Authentik / Tinyauth
+      # PODCASTINDEX_KEY: …             # optional second search directory (free key)
+      # PODCASTINDEX_SECRET: …
+      # NOTIFY_URL: http://apprise:8000/notify/podcasts   # new-episode notifications (NOTIFY_KIND apprise|ntfy|webhook)
+      # DEMO_DATA: "true"               # seed a few made-up shows into an empty database
+    volumes:
+      - ./data:/data                    # database, downloaded episodes (data/media), artwork
