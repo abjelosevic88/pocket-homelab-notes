@@ -12,6 +12,7 @@ import Calendar from './pages/Calendar'
 import Trash from './pages/Trash'
 import Settings from './pages/Settings'
 import Share from './pages/Share'
+import { ErrorBoundary } from './components/ErrorBoundary'
 
 function Gate({ children }: { children: React.ReactNode }) {
   const { status, user } = useApp()
@@ -44,7 +45,7 @@ function App() {
 function Root() {
   // The public share page needs no account: it does not wait for one.
   if (location.pathname.startsWith('/s/')) return <ToastProvider><Routes><Route path="/s/:token" element={<Share />} /></Routes></ToastProvider>
-  return <ToastProvider><AppProvider><App /></AppProvider></ToastProvider>
+  return <ErrorBoundary where="app"><ToastProvider><AppProvider><App /></AppProvider></ToastProvider></ErrorBoundary>
 }
 
 ReactDOM.createRoot(document.getElementById('root')!).render(

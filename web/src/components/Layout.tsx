@@ -7,6 +7,7 @@ import { ago, leaf, tint } from '../lib/format'
 import { Avatar } from './people'
 import { Confirm, Modal, useToast } from './ui'
 import { QuickSwitcher } from './QuickSwitcher'
+import { ErrorBoundary } from './ErrorBoundary'
 
 interface TreeNode { path: string; name: string; count: number; total: number; children: TreeNode[] }
 
@@ -145,7 +146,7 @@ export default function Layout() {
           <button className="btn ghost icon" onClick={() => setSwitcher(true)} aria-label="Find">⌕</button>
           <button className="btn ghost icon" onClick={newNote} aria-label="New note">＋</button>
         </header>
-        <main className="content"><Outlet /></main>
+        <main className="content"><ErrorBoundary key={loc.pathname} where={loc.pathname}><Outlet /></ErrorBoundary></main>
       </div>
       {switcher && <QuickSwitcher onClose={() => setSwitcher(false)} onNew={() => { setSwitcher(false); newNote() }} onToday={() => { setSwitcher(false); openToday() }} />}
       {folderMenu && <div className="ctx-menu" style={{ left: folderMenu.x, top: folderMenu.y }} onMouseLeave={() => setFolderMenu(null)}>

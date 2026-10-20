@@ -174,6 +174,7 @@ func (s *Server) Router() http.Handler {
 		r.Get("/auth/status", s.handleAuthStatus)
 		r.Get("/auth/oidc/start", s.handleOIDCStart)
 		r.Get("/auth/oidc/callback", s.handleOIDCCallback)
+		r.Post("/client-error", s.handleClientError)
 
 		r.Group(func(r chi.Router) {
 			r.Use(s.requireAuth)
@@ -427,6 +428,24 @@ func (s *Server) coreStatus() map[string]any {
 	s.coreMu.Lock()
 	defer s.coreMu.Unlock()
 	return map[string]any{"configured": s.core.Configured(), "url": s.cfg.CoreURL, "registered": s.coreOK, "error": s.coreErr}
+}
+
+// handleClientError writes a crash of the web app into the server's log, so
+// a blank page on someone's browser leaves a trace here.
+func (s *Server) handleClientError(w http.ResponseWriter, r *http.Request) {
+	var in struct {
+		Message, Stack, Component, URL, Where, Agent string
+	}
+	if err := json.NewDecoder(http.MaxBytesReader(w, r.Body, 16<<10)).Decode(&in); err != nil {
+		w.WriteHeader(http.StatusNoContent)
+		return
+	}
+	who := ""
+	if u, err := s.resolveUser(r); err == nil && u != nil {
+		who = u.Email
+	}
+	s.log.Warn("web app crashed", "user", who, "where", in.Where, "url", in.URL, "message", in.Message, "stack", in.Stack, "component", in.Component, "agent", in.Agent)
+	w.WriteHeader(http.StatusNoContent)
 }
 
 // ---------- health / metrics ----------
