@@ -6,7 +6,7 @@ Pocket Notes is a notes server that does what Nextcloud Notes does and a good de
 search, tags, links between notes with backlinks, every checkbox gathered into one task list, daily
 notes with quick capture, a version history of every change from any device, a trash, public
 read-only links, and a rich editor whose `/` menu reaches into the rest of the homelab (photos from
-Immich, documents from Paperless, issues from Forgejo, the server's state, the week's viewing,
+Immich, documents from Pocket Documents, issues from Forgejo, the server's state, the week's viewing,
 spending, the car's log…).
 
 The notes stay ordinary `.md` files in folders. Point it at the folder Nextcloud Notes uses and both
@@ -63,7 +63,7 @@ Notes apps and the Pocket Homelab app work against it too.
 - Title follows the first line, as in Nextcloud Notes (or not — your choice).
 
 **Homelab tools** in the `/` menu (each shown when its service is connected)
-- *Link to something*: Nextcloud files (full-text), Paperless documents, Forgejo issues and pull
+- *Link to something*: Nextcloud files (full-text), Pocket Documents (full text and OCR), Forgejo issues and pull
   requests, Jellyfin titles, Immich photos — the note gets a link, not a copy.
 - *From Photos* (Immich, smart search) and *From Nextcloud*: put pictures and files into a note.
 - *Make this line a task* (Nextcloud Tasks or Deck) and *Make this line a transaction* (Pocket
@@ -91,7 +91,7 @@ Notes apps and the Pocket Homelab app work against it too.
   Nextcloud Notes apps and the Pocket Homelab app work against Pocket Notes as they are.
 - Every person has their own notes, storage and settings; admins see no one else's.
 - Pocket Core: "Sign in with Pocket Core", each person's own service accounts for the integrations,
-  app links for Pocket Habits / Money / Garage / Podcasts, `notes.created/updated/deleted` events,
+  app links for Pocket Habits / Money / Garage / Podcasts / Documents, `notes.created/updated/deleted` events,
   and `notes:read` / `notes:write` for other Pocket apps.
 - `GET /api/v1/dashboard` for Homepage, Prometheus `/metrics`, API tokens, dark mode, a PWA.
 

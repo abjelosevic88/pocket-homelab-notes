@@ -102,7 +102,7 @@ const lineItem = (tool) => (ctx) => {
 export const entries = [
   ['snapshot', { title: 'Homelab snapshot', label: 'Homelab snapshot status server now incident', description: 'How the server, storage, monitors and downloads stand right now, as a table', icon: icons.snapshot, onRun: simple('snapshot') }],
   ['task', { title: 'Make this line a task', label: 'Make this line a task todo deck card send', description: 'Sends the line above to Nextcloud Tasks or Deck and leaves a link behind', icon: icons.task, onRun: taskItem }],
-  ['link', { title: 'Link to something', label: 'Link to something file document issue pull request movie series paperless forgejo jellyfin nextcloud', description: 'A file, document, issue or title, found with the app’s search', icon: icons.link, onRun: simple('link') }],
+  ['link', { title: 'Link to something', label: 'Link to something file document issue pull request movie series pocket documents forgejo jellyfin nextcloud', description: 'A file, document, issue or title, found with the app’s search', icon: icons.link, onRun: simple('link') }],
   ['bookmark', { title: 'Web bookmark', label: 'Web bookmark url address website page', description: 'An address becomes a link with the page’s title', icon: icons.bookmark, onRun: simple('bookmark') }],
   ['scan', { title: 'Scan a document', label: 'Scan a document camera pages pdf paper', description: 'The camera scans pages into a PDF stored with the note', icon: icons.scan, onRun: simple('scan') }],
   ['camera', { title: 'Take a photo', label: 'Take a photo camera picture', description: 'A picture taken now, stored with the note', icon: icons.camera, onRun: simple('camera') }],

@@ -106,11 +106,11 @@ func TestLinkSearchMergesAndReportsFailures(t *testing.T) {
 
 	nc := fakeNextcloud(t, true)
 	defer nc.Close()
-	paperless := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	documents := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(500)
 		_, _ = io.WriteString(w, "database is locked")
 	}))
-	defer paperless.Close()
+	defer documents.Close()
 	forgejo := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.Header.Get("Authorization") != "token fj-key" || r.URL.Path != "/api/v1/repos/issues/search" || r.URL.Query().Get("q") != "invoice" {
 			t.Errorf("forgejo: %s %v", r.URL, r.Header)
@@ -146,7 +146,7 @@ func TestLinkSearchMergesAndReportsFailures(t *testing.T) {
 	defer jellyfin.Close()
 
 	connectDirect(h, alice.ID, "nextcloud", nc.URL, "app-pass", "alice")
-	connectDirect(h, alice.ID, "paperless", paperless.URL, "pl-key", "")
+	connectApp(t, h, alice.ID, "documents", documents.URL, "pd_alice")
 	connectDirect(h, alice.ID, "forgejo", forgejo.URL, "fj-key", "")
 	connectDirect(h, alice.ID, "jellyfin", jellyfin.URL, "jf-key", "")
 	// Immich is not connected: it is left out, without an error.
@@ -163,8 +163,8 @@ func TestLinkSearchMergesAndReportsFailures(t *testing.T) {
 	if strings.Join(order, ",") != "nextcloud,forgejo,jellyfin" {
 		t.Fatalf("sections %v", order)
 	}
-	if a.Errors["paperless"] == "" || strings.Contains(a.Errors["paperless"], "pl-key") {
-		t.Errorf("paperless error %q", a.Errors["paperless"])
+	if e := a.Errors["documents"]; !strings.Contains(e, "Pocket Documents") || !strings.Contains(e, "database is locked") || strings.Contains(e, "pd_alice") {
+		t.Errorf("documents error %q", e)
 	}
 	if _, ok := a.Errors["immich"]; ok || len(a.Errors) != 1 {
 		t.Errorf("errors %v", a.Errors)
@@ -201,14 +201,8 @@ func TestLinkSearchFallsBackToNames(t *testing.T) {
 	alice, tok := h.user("alice@example.com")
 	nc := fakeNextcloud(t, false)
 	defer nc.Close()
-	paperless := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.Header.Get("Authorization") != "Token pl-key" || r.URL.Query().Get("query") != "invoice" {
-			t.Errorf("paperless %s %v", r.URL, r.Header)
-		}
-		w.Header().Set("Content-Type", "application/json")
-		_, _ = io.WriteString(w, `{"count":1,"next":null,"previous":null,"all":[5],"results":[{"id":5,"title":"Invoice ACME","created":"2026-10-01","created_date":"2026-10-01","tags":[]}]}`)
-	}))
-	defer paperless.Close()
+	documents := fakeDocuments(t)
+	defer documents.Close()
 	immich := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path != "/api/search/smart" || r.Header.Get("x-api-key") != "im-key" {
 			t.Errorf("immich %s", r.URL)
@@ -218,7 +212,7 @@ func TestLinkSearchFallsBackToNames(t *testing.T) {
 	}))
 	defer immich.Close()
 	connectDirect(h, alice.ID, "nextcloud", nc.URL, "app-pass", "alice")
-	connectDirect(h, alice.ID, "paperless", paperless.URL, "pl-key", "")
+	connectApp(t, h, alice.ID, "documents", documents.URL, "pd_alice")
 	connectDirect(h, alice.ID, "immich", immich.URL, "im-key", "")
 
 	var a linkAnswer
@@ -235,9 +229,10 @@ func TestLinkSearchFallsBackToNames(t *testing.T) {
 	if len(f) != 1 || f[0].Title != "invoice 2019.pdf" || f[0].URL != nc.URL+"/index.php/f/77" || f[0].Detail != "/Old" {
 		t.Errorf("by name %+v", f)
 	}
-	d := a.section("paperless")
-	if len(d) != 1 || d[0].URL != paperless.URL+"/documents/5/details" || d[0].Detail != "1 Oct 2026" || d[0].Icon != "document" {
-		t.Errorf("paperless %+v", d)
+	d := a.section("documents")
+	if len(d) != 1 || d[0].URL != documents.URL+"/documents/5" || d[0].Title != "Invoice ACME" || d[0].Icon != "document" ||
+		d[0].Detail != "1 Oct 2026 · ACME d.o.o. · Invoice · …the invoice total is 24.50…" || d[0].Markdown != "[Invoice ACME]("+documents.URL+"/documents/5)" {
+		t.Errorf("documents %+v", d)
 	}
 	p := a.section("immich")
 	if len(p) != 1 || p[0].URL != immich.URL+"/photos/0b1c2d3e-aaaa-bbbb-cccc-111122223333" || p[0].Icon != "photo" {
@@ -250,6 +245,136 @@ func TestLinkSearchFallsBackToNames(t *testing.T) {
 	h.do(bTok, "GET", "/api/v1/tools/link?q=invoice", nil, &b)
 	if len(b.Sections) != 0 || len(b.Errors) != 0 {
 		t.Errorf("bob %+v", b)
+	}
+}
+
+// fakeDocuments answers Pocket Documents' search for two people, each with
+// their own pd_ token and their own documents.
+func fakeDocuments(t *testing.T) *httptest.Server {
+	return httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		q := r.URL.Query()
+		if r.Method != "GET" || r.URL.Path != "/api/v1/documents" || q.Get("q") != "invoice" || q.Get("limit") != "6" || q.Get("no_facets") != "1" {
+			t.Errorf("documents: unexpected %s %s", r.Method, r.URL)
+		}
+		w.Header().Set("Content-Type", "application/json")
+		switch r.Header.Get("Authorization") {
+		case "Bearer pd_alice":
+			_, _ = io.WriteString(w, `{"count":1,"offset":0,"limit":6,"results":[{"id":5,"title":"Invoice ACME","created":"2026-10-01","correspondent":3,"correspondent_name":"ACME d.o.o.","document_type":2,"document_type_name":"Invoice","snippet":"…the [[[invoice]]]\n total is 24.50…","mime":"application/pdf","tags":[]}]}`)
+		case "Bearer pd_bob":
+			_, _ = io.WriteString(w, `{"count":1,"offset":0,"limit":6,"results":[{"id":9,"title":"","created":"2025-03-15T00:00:00Z","mime":"image/jpeg","tags":[]}]}`)
+		default:
+			w.WriteHeader(401)
+			_, _ = io.WriteString(w, `{"error":"unauthorized"}`)
+		}
+	}))
+}
+
+// Each person searches Pocket Documents with their own token and gets their
+// own documents; links point at the app's public address when one is set.
+func TestLinkSearchDocumentsPerPerson(t *testing.T) {
+	h := newHarness(t)
+	alice, aTok := h.user("alice@example.com")
+	bob, bTok := h.user("bob@example.com")
+	carol, cTok := h.user("carol@example.com")
+	_, dTok := h.user("dave@example.com")
+	documents := fakeDocuments(t)
+	defer documents.Close()
+	connectApp(t, h, alice.ID, "documents", documents.URL, "pd_alice")
+	connectApp(t, h, bob.ID, "documents", documents.URL, "pd_bob")
+	_ = h.st.SetUserSetting(context.Background(), bob.ID, "app.documents.public_url", "https://documents.example.org/")
+	connectApp(t, h, carol.ID, "documents", documents.URL, "pd_wrong")
+
+	var a, b, c, d linkAnswer
+	h.do(aTok, "GET", "/api/v1/tools/link?q=invoice", nil, &a)
+	h.do(bTok, "GET", "/api/v1/tools/link?q=invoice", nil, &b)
+	h.do(cTok, "GET", "/api/v1/tools/link?q=invoice", nil, &c)
+	h.do(dTok, "GET", "/api/v1/tools/link?q=invoice", nil, &d)
+	if s := a.section("documents"); len(s) != 1 || s[0].ID != "doc-5" || len(a.Errors) != 0 {
+		t.Errorf("alice %+v", a)
+	}
+	if len(a.Sections) != 1 || a.Sections[0].Title != "Pocket Documents" {
+		t.Errorf("alice sections %+v", a.Sections)
+	}
+	if s := b.section("documents"); len(s) != 1 || s[0].ID != "doc-9" || s[0].Title != "Document 9" || s[0].Detail != "15 Mar 2025" || s[0].URL != "https://documents.example.org/documents/9" {
+		t.Errorf("bob %+v", b)
+	}
+	if len(c.Sections) != 0 || !strings.Contains(c.Errors["documents"], "refused the key") || strings.Contains(c.Errors["documents"], "pd_wrong") {
+		t.Errorf("carol %+v", c)
+	}
+	// Not connected: left out, no error.
+	if len(d.Sections) != 0 || len(d.Errors) != 0 {
+		t.Errorf("dave %+v", d)
+	}
+
+	// The link tool is offered with Pocket Documents alone.
+	var tools map[string]bool
+	h.do(aTok, "GET", "/api/v1/tools", nil, &tools)
+	if !tools["link"] {
+		t.Errorf("tools %v", tools)
+	}
+	h.do(dTok, "GET", "/api/v1/tools", nil, &tools)
+	if tools["link"] {
+		t.Errorf("dave tools %v", tools)
+	}
+	// Off means off, even with a token typed in.
+	_ = h.st.SetUserSetting(context.Background(), alice.ID, "app.documents.mode", "off")
+	var off linkAnswer
+	h.do(aTok, "GET", "/api/v1/tools/link?q=invoice", nil, &off)
+	if len(off.Sections) != 0 || len(off.Errors) != 0 {
+		t.Errorf("off %+v", off)
+	}
+}
+
+// Settings → Integrations lists Pocket Documents as an app; Paperless is gone.
+func TestIntegrationsDocumentsReplacesPaperless(t *testing.T) {
+	h := newHarness(t)
+	_, tok := h.user("alice@example.com")
+	var out struct {
+		Items []integrationView `json:"items"`
+	}
+	h.do(tok, "GET", "/api/v1/integrations", nil, &out)
+	found := false
+	for _, i := range out.Items {
+		if i.Name == "paperless" {
+			t.Errorf("paperless still listed: %+v", i)
+		}
+		if i.Kind == "app" && i.Name == "documents" {
+			found = i.Title == "Pocket Documents" && i.KeyLabel == "API token" && i.Mode == "off"
+		}
+	}
+	if !found {
+		t.Errorf("documents missing: %+v", out.Items)
+	}
+	if code := h.do(tok, "PUT", "/api/v1/integrations/svc/paperless", map[string]string{"mode": "off"}, nil); code != 404 {
+		t.Errorf("svc/paperless PUT %d", code)
+	}
+	for _, u := range serviceUses {
+		if u.Type == "paperless" {
+			t.Error("paperless still in serviceUses")
+		}
+	}
+	if sc := useScopes("documents"); len(sc) != 1 || sc[0] != "documents:read" {
+		t.Errorf("documents scopes %v", sc)
+	}
+
+	// The test button reaches the app with the typed-in token.
+	documents := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/api/v1/auth/me" || r.Header.Get("Authorization") != "Bearer pd_alice" {
+			w.WriteHeader(401)
+			return
+		}
+		_, _ = io.WriteString(w, `{"id":1,"email":"alice@example.com"}`)
+	}))
+	defer documents.Close()
+	if code := h.do(tok, "PUT", "/api/v1/integrations/app/documents", map[string]string{"mode": "direct", "url": documents.URL, "key": "pd_alice"}, nil); code != 200 {
+		t.Fatalf("PUT %d", code)
+	}
+	var res struct {
+		OK  bool   `json:"ok"`
+		Via string `json:"via"`
+	}
+	if code := h.do(tok, "POST", "/api/v1/integrations/app/documents/test", nil, &res); code != 200 || !res.OK || res.Via != "direct" {
+		t.Errorf("test %d %+v", code, res)
 	}
 }
 

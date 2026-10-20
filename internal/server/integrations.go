@@ -27,7 +27,6 @@ import (
 var serviceUses = []core.ServiceUse{
 	{Type: "nextcloud", Reason: "Your notes folder, files to attach or link, and lines sent to Tasks or Deck"},
 	{Type: "immich", Reason: "Photos from your library, put into a note"},
-	{Type: "paperless", Reason: "Links to your documents"},
 	{Type: "forgejo", Reason: "Links to issues and pull requests"},
 	{Type: "jellyfin", Reason: "Links to films and series"},
 	{Type: "jellystat", Reason: "What you watched this week, in a note"},
@@ -42,20 +41,20 @@ var serviceUses = []core.ServiceUse{
 
 // serviceNames are the names people see.
 var serviceNames = map[string]string{
-	"nextcloud": "Nextcloud", "immich": "Immich", "paperless": "Paperless-ngx", "forgejo": "Forgejo", "jellyfin": "Jellyfin",
+	"nextcloud": "Nextcloud", "immich": "Immich", "forgejo": "Forgejo", "jellyfin": "Jellyfin",
 	"jellystat": "Jellystat", "audiobookshelf": "Audiobookshelf", "kuma": "Uptime Kuma", "scrutiny": "Scrutiny", "backrest": "Backrest",
 	"adguard": "AdGuard Home", "glances": "Glances", "beszel": "Beszel",
-	"habits": "Pocket Habits", "money": "Pocket Money", "garage": "Pocket Garage", "podcasts": "Pocket Podcasts",
+	"habits": "Pocket Habits", "money": "Pocket Money", "garage": "Pocket Garage", "podcasts": "Pocket Podcasts", "documents": "Pocket Documents",
 }
 
 // directFields says what a typed-in connection asks for: the key's label and
 // whether a username goes with it ("" = no key at all).
 var directFields = map[string][2]string{
-	"nextcloud": {"App password", "Username"}, "immich": {"API key", ""}, "paperless": {"Token", ""}, "forgejo": {"Token", ""},
+	"nextcloud": {"App password", "Username"}, "immich": {"API key", ""}, "forgejo": {"Token", ""},
 	"jellyfin": {"API key", "User id (optional)"}, "jellystat": {"API key", ""}, "audiobookshelf": {"Token", ""},
 	"kuma": {"API key (optional)", "Status page slug"}, "scrutiny": {"", ""}, "backrest": {"Password", "Username"}, "adguard": {"Password", "Username"},
 	"glances": {"", ""}, "beszel": {"Password", "Email"},
-	"habits": {"API token", ""}, "money": {"API token", ""}, "garage": {"API token", ""}, "podcasts": {"API token", ""},
+	"habits": {"API token", ""}, "money": {"API token", ""}, "garage": {"API token", ""}, "podcasts": {"API token", ""}, "documents": {"API token", ""},
 }
 
 // errNotConnected is a tool asked for a service the person has not connected.
@@ -162,26 +161,48 @@ func (s *Server) service(ctx context.Context, uid int64, typ string) (*svcCred, 
 // appToken returns the address of a Pocket app and a token that acts for the
 // person there (a short-lived Core link token, or one typed in).
 func (s *Server) appToken(ctx context.Context, uid int64, app string, scopes ...string) (base, token string, err error) {
+	c, err := s.appCred(ctx, uid, app, scopes...)
+	if err != nil {
+		return "", "", err
+	}
+	return c.URL, c.Key, nil
+}
+
+// appCred is appToken with the app's public address too (for links people
+// open), in the shape the services use: Key is the bearer token.
+func (s *Server) appCred(ctx context.Context, uid int64, app string, scopes ...string) (*svcCred, error) {
 	switch s.integrationMode(ctx, uid, "app", app) {
 	case "direct":
-		u := strings.TrimRight(s.store.UserSetting(ctx, uid, "app."+app+".url"), "/")
-		t := s.store.UserSetting(ctx, uid, "app."+app+".key")
+		kv := s.store.UserSettingsPrefix(ctx, uid, "app."+app+".")
+		u := strings.TrimRight(kv["app."+app+".url"], "/")
+		t := kv["app."+app+".key"]
 		if u == "" || t == "" {
-			return "", "", errNotConnected{Name: app}
+			return nil, errNotConnected{Name: app}
 		}
-		return u, t, nil
+		return &svcCred{Type: app, URL: u, PublicURL: strings.TrimRight(firstNonEmpty(kv["app."+app+".public_url"], u), "/"), Key: t, Source: "direct"}, nil
 	case "core":
 		lt, err := s.core.ActAs(ctx, s.userEmail(ctx, uid), app, scopes...)
 		if err != nil {
 			var le *core.LinkError
 			if errors.As(err, &le) {
-				return "", "", errNotConnected{Name: app, Msg: fmt.Sprintf("%s through Pocket Core: %s", serviceNames[app], le.Message)}
+				return nil, errNotConnected{Name: app, Msg: fmt.Sprintf("%s through Pocket Core: %s", serviceNames[app], le.Message)}
 			}
-			return "", "", fmt.Errorf("%s through Pocket Core: %w", serviceNames[app], err)
+			return nil, fmt.Errorf("%s through Pocket Core: %w", serviceNames[app], err)
 		}
-		return strings.TrimRight(lt.URL, "/"), lt.AccessToken, nil
+		u := strings.TrimRight(lt.URL, "/")
+		return &svcCred{Type: app, URL: u, PublicURL: strings.TrimRight(firstNonEmpty(lt.PublicURL, u), "/"), Key: lt.AccessToken, Source: "core"}, nil
 	}
-	return "", "", errNotConnected{Name: app}
+	return nil, errNotConnected{Name: app}
+}
+
+// useScopes are the scopes Notes declares for a Pocket app in linkUses.
+func useScopes(app string) []string {
+	for _, u := range linkUses {
+		if u.App == app {
+			return u.Scopes
+		}
+	}
+	return nil
 }
 
 // appPublicURL is where people open a Pocket app (for links in notes).
@@ -313,9 +334,6 @@ var integrationTests = map[string]func(s *Server, ctx context.Context, c *svcCre
 	},
 	"immich": func(s *Server, ctx context.Context, c *svcCred) error {
 		return s.callJSON(ctx, "immich", http.MethodGet, c.API("/api/users/me"), map[string]string{"x-api-key": c.Key}, nil, nil)
-	},
-	"paperless": func(s *Server, ctx context.Context, c *svcCred) error {
-		return s.callJSON(ctx, "paperless", http.MethodGet, c.API("/api/documents/?page_size=1"), map[string]string{"Authorization": "Token " + c.Key}, nil, nil)
 	},
 	"forgejo": func(s *Server, ctx context.Context, c *svcCred) error {
 		return s.callJSON(ctx, "forgejo", http.MethodGet, c.API("/api/v1/user"), map[string]string{"Authorization": "token " + c.Key}, nil, nil)
@@ -453,13 +471,7 @@ func (s *Server) handleTestIntegration(w http.ResponseWriter, r *http.Request) {
 	cctx, cancel := context.WithTimeout(ctx, 15*time.Second)
 	defer cancel()
 	if kind == "app" {
-		var scopes []string
-		for _, u := range linkUses {
-			if u.App == name {
-				scopes = u.Scopes
-			}
-		}
-		base, tok, err := s.appToken(cctx, uid, name, scopes...)
+		base, tok, err := s.appToken(cctx, uid, name, useScopes(name)...)
 		if err == nil {
 			err = s.callJSON(cctx, name, http.MethodGet, base+"/api/v1/auth/me", map[string]string{"Authorization": "Bearer " + tok}, nil, nil)
 		}
@@ -488,7 +500,7 @@ func (s *Server) handleTestIntegration(w http.ResponseWriter, r *http.Request) {
 // toolNeeds says what each editor tool needs: any one of the listed
 // services ("svc:x") or apps ("app:x") connected.
 var toolNeeds = map[string][]string{
-	"link":      {"svc:nextcloud", "svc:paperless", "svc:forgejo", "svc:jellyfin", "svc:immich"},
+	"link":      {"svc:nextcloud", "app:documents", "svc:forgejo", "svc:jellyfin", "svc:immich"},
 	"photos":    {"svc:immich"},
 	"files":     {"svc:nextcloud"},
 	"bookmark":  {},
@@ -513,13 +525,7 @@ func (s *Server) connected(ctx context.Context, uid int64, kind, name string) bo
 	case "core":
 		email := s.userEmail(ctx, uid)
 		if kind == "app" {
-			var scopes []string
-			for _, u := range linkUses {
-				if u.App == name {
-					scopes = u.Scopes
-				}
-			}
-			on, _ := s.core.LinkOn(ctx, email, name, scopes...)
+			on, _ := s.core.LinkOn(ctx, email, name, useScopes(name)...)
 			return on
 		}
 		_, err := s.core.ServiceFor(ctx, email, name)

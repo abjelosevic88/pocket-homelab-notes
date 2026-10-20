@@ -17,7 +17,7 @@ import (
 	"unicode/utf8"
 )
 
-// Links to what lives elsewhere (Nextcloud files, Paperless documents, Forgejo
+// Links to what lives elsewhere (Nextcloud files, Pocket Documents, Forgejo
 // issues, Jellyfin titles, Immich photos) and web bookmarks. The note gets a
 // link, not a copy.
 
@@ -48,16 +48,26 @@ type linkSection struct {
 // linkSearcher finds things in one service; note is a footer to show, if any.
 type linkSearcher func(s *Server, ctx context.Context, c *svcCred, q string) (items []linkItem, note string, err error)
 
-// linkSources are searched in this order and shown in it.
+// linkSources are searched in this order and shown in it. Kind is "svc" for a
+// service (a Core service connection or a typed-in key) or "app" for a Pocket
+// app (a Core link token with the scopes in linkUses, or a typed-in token).
 var linkSources = []struct {
-	Source, Title string
-	Search        linkSearcher
+	Kind, Source, Title string
+	Search              linkSearcher
 }{
-	{"nextcloud", "Nextcloud", linkNextcloud},
-	{"paperless", "Paperless", linkPaperless},
-	{"forgejo", "Forgejo", linkForgejo},
-	{"jellyfin", "Jellyfin", linkJellyfin},
-	{"immich", "Immich", linkImmich},
+	{"svc", "nextcloud", "Nextcloud", linkNextcloud},
+	{"app", "documents", "Pocket Documents", linkDocuments},
+	{"svc", "forgejo", "Forgejo", linkForgejo},
+	{"svc", "jellyfin", "Jellyfin", linkJellyfin},
+	{"svc", "immich", "Immich", linkImmich},
+}
+
+// linkCred is the person's way into one link source.
+func (s *Server) linkCred(ctx context.Context, uid int64, kind, name string) (*svcCred, error) {
+	if kind == "app" {
+		return s.appCred(ctx, uid, name, useScopes(name)...)
+	}
+	return s.service(ctx, uid, name)
 }
 
 const linkPerSource = 6
@@ -81,7 +91,7 @@ func (s *Server) handleToolLink(w http.ResponseWriter, r *http.Request) {
 				defer wg.Done()
 				cctx, cancel := context.WithTimeout(ctx, 8*time.Second)
 				defer cancel()
-				c, err := s.service(cctx, uid, src.Source)
+				c, err := s.linkCred(cctx, uid, src.Kind, src.Source)
 				if err == nil {
 					results[i].items, results[i].note, err = src.Search(s, cctx, c, q)
 				}
@@ -165,24 +175,54 @@ func linkNextcloud(s *Server, ctx context.Context, c *svcCred, q string) ([]link
 	return items, note, nil
 }
 
-func linkPaperless(s *Server, ctx context.Context, c *svcCred, q string) ([]linkItem, string, error) {
+// linkDocuments: Pocket Documents' search (full text and OCR, field syntax
+// like from:ikea or created:2024, Cyrillic and Latin alike). The detail line
+// is the date, correspondent and type, then the matching words.
+func linkDocuments(s *Server, ctx context.Context, c *svcCred, q string) ([]linkItem, string, error) {
 	var res struct {
 		Results []struct {
-			ID      int64  `json:"id"`
-			Title   string `json:"title"`
-			Created string `json:"created"`
+			ID            int64  `json:"id"`
+			Title         string `json:"title"`
+			Created       string `json:"created"`
+			Correspondent string `json:"correspondent_name"`
+			DocumentType  string `json:"document_type_name"`
+			Snippet       string `json:"snippet"`
 		} `json:"results"`
 	}
-	v := url.Values{"query": {q}, "page": {"1"}, "page_size": {strconv.Itoa(linkPerSource)}, "truncate_content": {"true"}}
-	if err := s.callJSON(ctx, "paperless", http.MethodGet, c.API("/api/documents/?"+v.Encode()), map[string]string{"Authorization": "Token " + c.Key}, nil, &res); err != nil {
+	v := url.Values{"q": {q}, "limit": {strconv.Itoa(linkPerSource)}, "no_facets": {"1"}}
+	if err := s.callJSON(ctx, "documents", http.MethodGet, c.API("/api/v1/documents?"+v.Encode()), map[string]string{"Authorization": "Bearer " + c.Key}, nil, &res); err != nil {
 		return nil, "", err
 	}
 	items := []linkItem{}
 	for _, d := range res.Results {
+		if len(items) == linkPerSource {
+			break
+		}
 		id := strconv.FormatInt(d.ID, 10)
-		items = append(items, newLinkItem("doc-"+id, firstNonEmpty(d.Title, "Document "+id), shortDay(d.Created), c.Link("/documents/"+id+"/details"), "document"))
+		var detail []string
+		for _, part := range []string{shortDay(d.Created), d.Correspondent, d.DocumentType} {
+			if part = strings.TrimSpace(part); part != "" {
+				detail = append(detail, part)
+			}
+		}
+		if snip := plainSnippet(d.Snippet, 120); snip != "" {
+			detail = append(detail, snip)
+		}
+		items = append(items, newLinkItem("doc-"+id, firstNonEmpty(strings.TrimSpace(d.Title), "Document "+id), strings.Join(detail, " · "), c.Link("/documents/"+id), "document"))
 	}
 	return items, "", nil
+}
+
+// plainSnippet is a search snippet without its [[[hit]]] marks, on one line,
+// cut to limit characters.
+func plainSnippet(v string, limit int) string {
+	v = strings.NewReplacer("[[[", "", "]]]", "").Replace(v)
+	v = strings.Join(strings.Fields(v), " ")
+	if utf8.RuneCountInString(v) > limit {
+		r := []rune(v)
+		v = strings.TrimSpace(string(r[:limit])) + "…"
+	}
+	return v
 }
 
 type forgejoIssue struct {
