@@ -704,7 +704,7 @@ func (s *Server) createNote(ctx context.Context, uid int64, in NoteInput, source
 	if in.Pinned != nil {
 		n.Pinned = *in.Pinned
 	}
-	if err := s.store.InsertNote(ctx, n, fileIDNum(ent.FileID)); err != nil {
+	if err := s.store.InsertNote(ctx, n, fileIDNum(ent.FileID), s.noteEvent(ctx, uid, "notes.created", n, source)); err != nil {
 		return nil, err
 	}
 	s.saveMeta(ctx, n, tags, links)
@@ -714,7 +714,6 @@ func (s *Server) createNote(ctx context.Context, uid int64, in NoteInput, source
 			_ = f.SetFavorite(ctx, p, true)
 		}
 	}
-	s.publish(uid, "notes.created", strconv.FormatInt(n.ID, 10), map[string]any{"id": n.ID, "title": n.Title, "category": n.Category, "source": source})
 	return n, nil
 }
 
@@ -762,7 +761,7 @@ func (s *Server) updateNote(ctx context.Context, uid, id int64, in NoteInput, if
 				// Someone else changed it: index their text and let the person decide.
 				t2, l2 := fill(n, string(cur))
 				n.RemoteETag, n.Modified = curEnt.ETag, modifiedOf(curEnt)
-				if uerr := s.store.UpdateNote(ctx, n); uerr == nil {
+				if uerr := s.store.UpdateNote(ctx, n, s.noteEvent(ctx, uid, "notes.updated", n, source)); uerr == nil {
 					s.saveMeta(ctx, n, t2, l2)
 					s.addVersion(ctx, n, "sync")
 				}
@@ -826,7 +825,7 @@ func (s *Server) updateNote(ctx context.Context, uid, id int64, in NoteInput, if
 	if in.Modified != nil && *in.Modified > 0 {
 		n.Modified = *in.Modified
 	}
-	if err := s.store.UpdateNote(ctx, n); err != nil {
+	if err := s.store.UpdateNote(ctx, n, s.noteEvent(ctx, uid, "notes.updated", n, source)); err != nil {
 		return nil, err
 	}
 	if contentChanged {
@@ -838,7 +837,6 @@ func (s *Server) updateNote(ctx context.Context, uid, id int64, in NoteInput, if
 			n.Tags = []string{}
 		}
 	}
-	s.publish(uid, "notes.updated", strconv.FormatInt(n.ID, 10), map[string]any{"id": n.ID, "title": n.Title, "category": n.Category, "source": source})
 	return n, nil
 }
 
@@ -858,10 +856,9 @@ func (s *Server) deleteNote(ctx context.Context, uid, id int64, source string) e
 		return err
 	}
 	_ = s.store.AddTrash(ctx, &store.TrashItem{UserID: uid, NoteID: n.ID, Path: n.Path, Title: n.Title, Category: n.Category, Content: n.Content, Favorite: n.Favorite, Pinned: n.Pinned, Reason: "deleted"})
-	if err := s.store.DeleteNote(ctx, uid, id); err != nil {
+	if err := s.store.DeleteNote(ctx, uid, id, s.noteEvent(ctx, uid, "notes.deleted", n, source)); err != nil {
 		return err
 	}
-	s.publish(uid, "notes.deleted", strconv.FormatInt(id, 10), map[string]any{"id": id, "title": n.Title, "category": n.Category, "source": source})
 	return nil
 }
 

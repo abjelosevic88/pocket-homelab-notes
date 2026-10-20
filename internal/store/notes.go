@@ -3,6 +3,7 @@ package store
 import (
 	"context"
 	"database/sql"
+	core "github.com/abjelosevic88/pocket-homelab-core/sdk"
 	"strconv"
 	"strings"
 	"time"
@@ -177,10 +178,15 @@ func (s *Store) PathTaken(ctx context.Context, userID int64, path string) bool {
 // InsertNote adds a note to the index. preferID (a storage file id, or the id
 // a note had before it went to the trash) is used as the note's id when no
 // other note has it.
-func (s *Store) InsertNote(ctx context.Context, n *Note, preferID int64) error {
+func (s *Store) InsertNote(ctx context.Context, n *Note, preferID int64, after ...core.CommitHook) error {
+	tx, err := s.DB.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
 	if preferID > 0 {
 		var taken int
-		_ = s.DB.QueryRowContext(ctx, `SELECT COUNT(1) FROM notes WHERE id = ?`, preferID).Scan(&taken)
+		_ = tx.QueryRowContext(ctx, `SELECT COUNT(1) FROM notes WHERE id = ?`, preferID).Scan(&taken)
 		if taken > 0 {
 			preferID = 0
 		}
@@ -189,9 +195,9 @@ func (s *Store) InsertNote(ctx context.Context, n *Note, preferID int64) error {
 	}
 	if preferID == 0 {
 		var max sql.NullInt64
-		_ = s.DB.QueryRowContext(ctx, `SELECT MAX(id) FROM notes WHERE id >= ?`, LocalIDBase).Scan(&max)
+		_ = tx.QueryRowContext(ctx, `SELECT MAX(id) FROM notes WHERE id >= ?`, LocalIDBase).Scan(&max)
 		var trashMax sql.NullInt64
-		_ = s.DB.QueryRowContext(ctx, `SELECT MAX(note_id) FROM trash WHERE note_id >= ?`, LocalIDBase).Scan(&trashMax)
+		_ = tx.QueryRowContext(ctx, `SELECT MAX(note_id) FROM trash WHERE note_id >= ?`, LocalIDBase).Scan(&trashMax)
 		preferID = LocalIDBase
 		if max.Valid && max.Int64 >= preferID {
 			preferID = max.Int64 + 1
@@ -205,7 +211,7 @@ func (s *Store) InsertNote(ctx context.Context, n *Note, preferID int64) error {
 		n.CreatedAt = now
 	}
 	n.UpdatedAt = now
-	_, err := s.DB.ExecContext(ctx, `INSERT INTO notes (id, user_id, path, category, title, content, hash, remote_etag, file_id, size, modified, favorite, pinned, readonly, excerpt, words, tasks_open, tasks_done, created_at, updated_at)
+	_, err = tx.ExecContext(ctx, `INSERT INTO notes (id, user_id, path, category, title, content, hash, remote_etag, file_id, size, modified, favorite, pinned, readonly, excerpt, words, tasks_open, tasks_done, created_at, updated_at)
 		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 		preferID, n.UserID, n.Path, n.Category, n.Title, n.Content, n.Hash, n.RemoteETag, n.FileID, n.Size, n.Modified,
 		boolInt(n.Favorite), boolInt(n.Pinned), boolInt(n.Readonly), n.Excerpt, n.Words, n.TasksOpen, n.TasksDone, n.CreatedAt, n.UpdatedAt)
@@ -213,13 +219,18 @@ func (s *Store) InsertNote(ctx context.Context, n *Note, preferID int64) error {
 		return conflict(err)
 	}
 	n.ID = preferID
-	return nil
+	return core.Commit(tx, after...)
 }
 
 // UpdateNote writes every indexed field of a note.
-func (s *Store) UpdateNote(ctx context.Context, n *Note) error {
+func (s *Store) UpdateNote(ctx context.Context, n *Note, after ...core.CommitHook) error {
+	tx, err := s.DB.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
 	n.UpdatedAt = Now()
-	res, err := s.DB.ExecContext(ctx, `UPDATE notes SET path = ?, category = ?, title = ?, content = ?, hash = ?, remote_etag = ?, file_id = ?, size = ?, modified = ?,
+	res, err := tx.ExecContext(ctx, `UPDATE notes SET path = ?, category = ?, title = ?, content = ?, hash = ?, remote_etag = ?, file_id = ?, size = ?, modified = ?,
 		favorite = ?, pinned = ?, readonly = ?, excerpt = ?, words = ?, tasks_open = ?, tasks_done = ?, updated_at = ? WHERE id = ? AND user_id = ?`,
 		n.Path, n.Category, n.Title, n.Content, n.Hash, n.RemoteETag, n.FileID, n.Size, n.Modified,
 		boolInt(n.Favorite), boolInt(n.Pinned), boolInt(n.Readonly), n.Excerpt, n.Words, n.TasksOpen, n.TasksDone, n.UpdatedAt, n.ID, n.UserID)
@@ -229,7 +240,7 @@ func (s *Store) UpdateNote(ctx context.Context, n *Note) error {
 	if k, _ := res.RowsAffected(); k == 0 {
 		return ErrNotFound
 	}
-	return nil
+	return core.Commit(tx, after...)
 }
 
 // SetRemote records the storage's ETag after a read or write that changed nothing else.
@@ -260,15 +271,20 @@ func (s *Store) TouchOpened(ctx context.Context, userID, id int64) {
 }
 
 // DeleteNote removes a note from the index.
-func (s *Store) DeleteNote(ctx context.Context, userID, id int64) error {
-	res, err := s.DB.ExecContext(ctx, `DELETE FROM notes WHERE id = ? AND user_id = ?`, id, userID)
+func (s *Store) DeleteNote(ctx context.Context, userID, id int64, after ...core.CommitHook) error {
+	tx, err := s.DB.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+	res, err := tx.ExecContext(ctx, `DELETE FROM notes WHERE id = ? AND user_id = ?`, id, userID)
 	if err != nil {
 		return err
 	}
 	if k, _ := res.RowsAffected(); k == 0 {
 		return ErrNotFound
 	}
-	return nil
+	return core.Commit(tx, after...)
 }
 
 // DeleteAllNotes forgets a person's whole index (a new storage, started fresh).
