@@ -492,3 +492,16 @@ select.xs { width: auto; padding: 2px 6px; font-size: 12px; border-radius: 6px; 
 @media (max-width: 760px) { .integration-form { margin-left: 0; } }
 .integration > .row.mt-s { margin-left: 44px; }
 @media (max-width: 760px) { .integration > .row.mt-s { margin-left: 0; } }
+/* Integration rows: icon, name and what it is for, then Test and the switch on the same line. */
+.integration { padding: 12px 16px; }
+.integration-head { display: flex; align-items: center; gap: 12px; }
+.integration-text { flex: 1; min-width: 0; line-height: 1.35; }
+.integration-actions { display: flex; align-items: center; gap: 6px; flex-shrink: 0; }
+.integration-result { margin: 6px 0 0 48px; }
+.integration > .integration-form { margin: 10px 0 0 48px; }
+@media (max-width: 760px) {
+  .integration-head { flex-wrap: wrap; align-items: flex-start; }
+  .integration-text { flex: 1 1 calc(100% - 48px); }
+  .integration-actions { flex: 1 1 100%; justify-content: flex-end; }
+  .integration-result, .integration > .integration-form { margin-left: 0; }
+}

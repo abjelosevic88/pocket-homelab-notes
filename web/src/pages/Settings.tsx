@@ -255,22 +255,22 @@ function IntegrationRow({ i, core, onSaved }: { i: Integration; core: boolean; o
   }
   return (
     <div className="integration">
-      <div className="row wrap">
+      <div className="integration-head">
         <IntegrationIcon i={i} />
-        <div className="grow"><b>{i.title}</b><div className="muted small">{i.reason}</div></div>
-        <Segmented size="sm" value={mode} onChange={setMode} options={[...(core ? [{ value: 'core' as const, label: 'Pocket Core' }] : []), { value: 'direct' as const, label: 'Direct' }, { value: 'off' as const, label: 'Off' }]} />
+        <div className="integration-text"><b>{i.title}</b><div className="muted small">{i.reason}</div></div>
+        <div className="integration-actions">
+          {dirty && <button className="btn primary sm" onClick={save} disabled={busy}>Save</button>}
+          {mode !== 'off' && <button className="btn sm" onClick={test} disabled={busy}>{busy ? 'Testing…' : 'Test'}</button>}
+          <Segmented size="sm" value={mode} onChange={setMode} options={[...(core ? [{ value: 'core' as const, label: 'Pocket Core' }] : []), { value: 'direct' as const, label: 'Direct' }, { value: 'off' as const, label: 'Off' }]} />
+        </div>
       </div>
+      {result && <div className={`integration-result small ${result.ok ? 'ok' : 'bad'}`}>{result.ok ? '✓ ' : '✕ '}{result.text}</div>}
       {mode === 'direct' && <div className="integration-form">
         <input value={f.url} onChange={e => setF({ ...f, url: e.target.value })} placeholder={i.kind === 'app' ? `https://${i.name}.example.com` : 'Address (http://… this server reaches)'} spellCheck={false} />
         <input value={f.public_url} onChange={e => setF({ ...f, public_url: e.target.value })} placeholder="Public address for links (optional)" spellCheck={false} />
         {i.user_label && <input value={f.user} onChange={e => setF({ ...f, user: e.target.value })} placeholder={i.user_label} autoComplete="off" />}
         {i.key_label && <input type="password" value={f.key} onChange={e => setF({ ...f, key: e.target.value })} placeholder={i.key_set ? `${i.key_label} — saved, type to replace` : i.key_label} autoComplete="new-password" />}
       </div>}
-      <div className="row mt-s">
-        {dirty && <button className="btn primary sm" onClick={save} disabled={busy}>Save</button>}
-        {mode !== 'off' && <button className="btn sm" onClick={test} disabled={busy}>Test</button>}
-        {result && <span className={`small ${result.ok ? 'ok' : 'bad'}`}>{result.text}</span>}
-      </div>
     </div>
   )
 }
