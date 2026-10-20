@@ -524,13 +524,19 @@ func (s *Server) handleTasks(w http.ResponseWriter, r *http.Request) {
 		s.fail(w, err, "tasks")
 		return
 	}
+	st, _ := s.store.GetSettings(ctx, uid)
+	templates := notesmd.SafeFolder(st.TemplatesFolder)
 	out := []TaskLine{}
 	for _, n := range notes {
 		if n.TasksOpen+n.TasksDone == 0 {
 			continue
 		}
+		// A template's boxes are blanks to fill in, not things to do.
+		if templates != "" && (n.Category == templates || strings.HasPrefix(n.Category, templates+"/")) {
+			continue
+		}
 		for _, t := range notesmd.Analyze(n.Content).Tasks {
-			if (state == "" || state == "open") && t.Done || state == "done" && !t.Done {
+			if (state == "" || state == "open") && t.Done || state == "done" && !t.Done || strings.TrimSpace(t.Text) == "" {
 				continue
 			}
 			out = append(out, TaskLine{Task: t, NoteID: n.ID, Title: n.Title, Category: n.Category, Modified: n.Modified})
@@ -1100,10 +1106,20 @@ func (s *Server) handleDashboard(w http.ResponseWriter, r *http.Request) {
 	ctx, uid := r.Context(), me(r)
 	d := s.store.NoteDashboard(ctx, uid)
 	today := time.Now().Format("2006-01-02")
+	st, _ := s.store.GetSettings(ctx, uid)
+	templates := notesmd.SafeFolder(st.TemplatesFolder)
 	if tasks, err := s.store.ListNotes(ctx, uid, store.NoteFilter{HasTasks: true, Content: true, Sort: "plain"}); err == nil {
+		d.OpenTasks = 0
 		for _, n := range tasks {
+			if templates != "" && (n.Category == templates || strings.HasPrefix(n.Category, templates+"/")) {
+				continue
+			}
 			for _, t := range notesmd.Analyze(n.Content).Tasks {
-				if !t.Done && t.Due != "" && t.Due <= today {
+				if t.Done || strings.TrimSpace(t.Text) == "" {
+					continue
+				}
+				d.OpenTasks++
+				if t.Due != "" && t.Due <= today {
 					d.DueTasks++
 				}
 			}

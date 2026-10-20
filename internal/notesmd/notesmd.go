@@ -25,7 +25,7 @@ type Task struct {
 // Info is everything the index keeps about a note's text.
 type Info struct {
 	Tags      []string
-	Links     []string // targets of [[wiki links]] and relative .md links, lower-cased titles or paths
+	Links     []string // [[wiki link]] titles (lower-cased), "path:" relative .md links, "id:" links to a note by id
 	Tasks     []Task
 	Excerpt   string
 	Words     int
@@ -38,6 +38,7 @@ var (
 	tagRe     = regexp.MustCompile(`(?:^|[\s(\[,;])#([\p{L}\p{N}_][\p{L}\p{N}_/\-]*)`)
 	wikiRe    = regexp.MustCompile(`\[\[([^\[\]|#]+)(?:#[^\[\]|]*)?(?:\|[^\[\]]*)?\]\]`)
 	mdLinkRe  = regexp.MustCompile(`\]\(([^()\s]+\.(?:md|txt))(?:#[^)]*)?\)`)
+	idLinkRe  = regexp.MustCompile(`\]\((?:https?://[^)\s]*?)?/(?:index\.php/)?(?:apps/notes/)?note/(\d+)\)`)
 	dueRe     = regexp.MustCompile(`(?:📅\s*|\bdue:\s*|@due\()(\d{4}-\d{2}-\d{2})\)?`)
 	inlineRe  = regexp.MustCompile("`[^`]*`")
 	urlRe     = regexp.MustCompile(`https?://\S+`)
@@ -122,6 +123,9 @@ func Analyze(content string) Info {
 			if t := strings.ToLower(strings.TrimSpace(m[1])); t != "" {
 				links[t] = true
 			}
+		}
+		for _, m := range idLinkRe.FindAllStringSubmatch(line, -1) {
+			links["id:"+m[1]] = true
 		}
 		for _, m := range mdLinkRe.FindAllStringSubmatch(line, -1) {
 			if strings.Contains(m[1], "://") {

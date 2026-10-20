@@ -1,0 +1,505 @@
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { Link, useNavigate } from 'react-router-dom'
+import { api, ApiError, upload, V1, qs } from '../lib/api'
+import { useApp } from '../lib/app-context'
+import type { Note } from '../lib/types'
+import { ago, headings, stamp, wordCount, leaf } from '../lib/format'
+import { Confirm, Loading, useToast } from './ui'
+import { RichEditor, type EditorMessage, type RichEditorHandle } from './RichEditor'
+import { MarkdownEditor, type MarkdownEditorHandle } from './MarkdownEditor'
+import { BookmarkSheet, DiagramViewer, ExpenseSheet, FilesPicker, HabitsSheet, LinkPicker, PhotoPicker, TaskSheet, TemplatePicker, VoiceMemo, toolError } from './Tools'
+import { HistoryModal, MoveModal, ShareModal } from './NoteDialogs'
+import { exportHTML, printNote } from '../lib/export'
+
+type Status = 'saved' | 'dirty' | 'saving' | 'error' | 'conflict' | 'offline'
+type Sheet =
+  | { kind: 'link' } | { kind: 'bookmark' } | { kind: 'photos' } | { kind: 'files' } | { kind: 'habits' } | { kind: 'voice' } | { kind: 'templates' }
+  | { kind: 'task'; line: Line | null } | { kind: 'expense'; line: Line | null } | { kind: 'diagram'; svg: string }
+  | { kind: 'history' } | { kind: 'share' } | { kind: 'move' } | { kind: 'delete' }
+type Line = { text: string; from?: number }
+
+const REPORTS: Record<string, string> = { snapshot: 'the homelab', attention: 'what needs attention', media: 'this week’s viewing and listening', spent: 'this month’s spending', fuel: 'the vehicle log', hosts: 'the network', processes: 'the server' }
+
+/** Where a note link points: the form Nextcloud Notes and the Pocket Homelab app understand. */
+export const noteURL = (id: number) => `${location.origin}/index.php/apps/notes/note/${id}`
+const noteIdIn = (url: string): number | null => {
+  const m = /\/(?:index\.php\/)?apps\/notes\/note\/(\d+)/.exec(url) || (url.startsWith(location.origin) || url.startsWith('/') ? /\/note\/(\d+)/.exec(url) : null)
+  return m ? Number(m[1]) : null
+}
+
+export default function NoteView({ id, onBack }: { id: number; onBack?: () => void }) {
+  const { settings, tools, theme, bump } = useApp()
+  const { toast } = useToast()
+  const navigate = useNavigate()
+  const [note, setNote] = useState<Note | null>(null)
+  const [err, setErr] = useState('')
+  const [draft, setDraft] = useState('')
+  const [revision, setRevision] = useState(0)
+  const [status, setStatus] = useState<Status>('saved')
+  const [conflict, setConflict] = useState<Note | null>(null)
+  const [mode, setMode] = useState<'rich' | 'markdown'>(() => (localStorage.getItem('pn-mode') as 'rich' | 'markdown') || settings?.editor || 'rich')
+  const [panel, setPanel] = useState<'' | 'outline' | 'links' | 'info'>(() => (localStorage.getItem('pn-panel') as '' | 'outline' | 'links' | 'info') || '')
+  const [sheet, setSheet] = useState<Sheet | null>(null)
+  const [title, setTitle] = useState('')
+  const [menu, setMenu] = useState(false)
+  const rich = useRef<RichEditorHandle>(null)
+  const md = useRef<MarkdownEditorHandle>(null)
+  const fileInput = useRef<HTMLInputElement>(null)
+  const cameraInput = useRef<HTMLInputElement>(null)
+
+  // What the server has, and what is on screen, by note: a save in flight belongs to its note.
+  const cur = useRef<{ id: number; etag: string; saved: string; draft: string; saving: boolean; again: boolean; timer: number }>({ id: 0, etag: '', saved: '', draft: '', saving: false, again: false, timer: 0 })
+
+  useEffect(() => { localStorage.setItem('pn-mode', mode) }, [mode])
+  useEffect(() => { localStorage.setItem('pn-panel', panel) }, [panel])
+
+  const save = useCallback(async (): Promise<void> => {
+    const c = cur.current
+    window.clearTimeout(c.timer)
+    if (c.saving) { c.again = true; return }
+    const text = c.draft, noteID = c.id
+    if (text === c.saved || !noteID) return
+    c.saving = true
+    setStatus('saving')
+    try {
+      const n = await api.put<Note>(`${V1}/notes/${noteID}`, { content: text, etag: c.etag })
+      if (cur.current.id !== noteID) return
+      c.saved = text; c.etag = n.etag
+      setNote(old => {
+        if (old && (old.title !== n.title || old.category !== n.category)) bump()
+        return { ...n, content: text }
+      })
+      setTitle(n.title)
+      setStatus(c.draft === text ? 'saved' : 'dirty')
+    } catch (e) {
+      if (cur.current.id !== noteID) return
+      if (e instanceof ApiError && e.status === 409 && e.data.note) {
+        setConflict(e.data.note as Note); setStatus('conflict')
+      } else {
+        setStatus(e instanceof ApiError ? 'error' : 'offline')
+        c.timer = window.setTimeout(() => save(), 8000)
+      }
+    } finally {
+      c.saving = false
+      if (c.again && cur.current.id === noteID) { c.again = false; if (c.draft !== c.saved) save() }
+    }
+  }, [bump])
+
+  const changed = useCallback((text: string) => {
+    const c = cur.current
+    c.draft = text
+    setDraft(text)
+    if (text === c.saved) return
+    setStatus(s => s === 'conflict' ? s : 'dirty')
+    window.clearTimeout(c.timer)
+    c.timer = window.setTimeout(() => { if (!conflictRef.current) save() }, 900)
+  }, [save])
+  const conflictRef = useRef<Note | null>(null)
+  conflictRef.current = conflict
+
+  // Opening a note: what was typed in the one before is saved first.
+  useEffect(() => {
+    let live = true
+    const prev = cur.current
+    const pending = rich.current?.flush()
+    if (pending != null && prev.id) prev.draft = pending
+    if (prev.id && prev.draft !== prev.saved && !conflictRef.current) {
+      api.put(`${V1}/notes/${prev.id}`, { content: prev.draft, etag: prev.etag }).then(() => bump()).catch(e => toast('The last note was not saved: ' + (e as Error).message, 'err'))
+    }
+    window.clearTimeout(prev.timer)
+    setNote(null); setErr(''); setConflict(null); setStatus('saved'); setSheet(null); setMenu(false)
+    api.get<Note>(`${V1}/notes/${id}`).then(n => {
+      if (!live) return
+      cur.current = { id, etag: n.etag, saved: n.content || '', draft: n.content || '', saving: false, again: false, timer: 0 }
+      setNote(n); setTitle(n.title); setDraft(n.content || ''); setRevision(r => r + 1)
+      if (n.path.toLowerCase().endsWith('.txt')) setMode('markdown')
+    }).catch(e => live && setErr((e as Error).message))
+    return () => { live = false }
+  }, [id]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Saved before the page goes; a warning while something is not.
+  useEffect(() => {
+    const h = (e: BeforeUnloadEvent) => {
+      const c = cur.current
+      const pending = rich.current?.flush()
+      if (pending != null) c.draft = pending
+      if (c.draft !== c.saved) {
+        e.preventDefault()
+        save()
+      }
+    }
+    window.addEventListener('beforeunload', h)
+    return () => window.removeEventListener('beforeunload', h)
+  }, [save])
+
+  // Changes made elsewhere (the phone, Nextcloud, another tab) come in while nothing is typed here.
+  useEffect(() => {
+    const look = async () => {
+      const c = cur.current
+      if (!c.id || document.hidden || c.saving || c.draft !== c.saved || conflictRef.current) return
+      try {
+        const n = await api.get<Note>(`${V1}/notes/${c.id}?peek=1`)
+        if (cur.current !== c || n.etag === c.etag || c.draft !== c.saved) return
+        c.etag = n.etag; c.saved = n.content || ''; c.draft = c.saved
+        setNote(n); setTitle(n.title); setDraft(c.saved); setRevision(r => r + 1)
+        toast('Updated with changes made elsewhere')
+      } catch {}
+    }
+    const t = window.setInterval(look, 20000)
+    window.addEventListener('focus', look)
+    return () => { window.clearInterval(t); window.removeEventListener('focus', look) }
+  }, [toast])
+
+  // ⌘S saves now.
+  useEffect(() => {
+    const h = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 's') { e.preventDefault(); const p = rich.current?.flush(); if (p != null) changed(p); save() }
+    }
+    window.addEventListener('keydown', h)
+    return () => window.removeEventListener('keydown', h)
+  }, [save, changed])
+
+  const patch = async (body: Record<string, unknown>, msg?: string) => {
+    if (!note) return
+    try {
+      await save()
+      const n = await api.put<Note>(`${V1}/notes/${note.id}`, { ...body, etag: cur.current.etag })
+      cur.current.etag = n.etag
+      if (typeof body.content === 'string') { cur.current.saved = body.content; cur.current.draft = body.content; setDraft(body.content); setRevision(r => r + 1) }
+      setNote(x => ({ ...n, content: x?.content ?? n.content })); setTitle(n.title); bump()
+      if (msg) toast(msg)
+    } catch (e) {
+      if (e instanceof ApiError && e.status === 409 && e.data.note) { setConflict(e.data.note as Note); setStatus('conflict') } else toast((e as Error).message, 'err')
+    }
+  }
+
+  // A new title renames the file; a first line that was the title follows it.
+  const rename = async () => {
+    if (!note) return
+    const t = title.trim()
+    if (!t || t === note.title) { setTitle(note.title); return }
+    const text = cur.current.draft
+    const lines = text.split('\n')
+    const first = lines.findIndex(l => l.trim())
+    let content: string | undefined
+    if (first >= 0) {
+      const m = /^(#{1,6})\s+(.*)$/.exec(lines[first].trim())
+      if (m && m[2].trim() === note.title) { lines[first] = `${m[1]} ${t}`; content = lines.join('\n') }
+    }
+    await patch(content !== undefined ? { title: t, content } : { title: t })
+  }
+
+  // ---- what goes into the note ----
+
+  const put = (markdown: string, at: 'inline' | 'block' = 'block') => {
+    if (!markdown) return
+    if (mode === 'rich') { if (at === 'inline') rich.current?.insertInline(markdown); else rich.current?.insertMarkdown(markdown) }
+    else md.current?.insert(markdown, at === 'block')
+  }
+  const replaceLine = (line: Line | null, markdown: string) => {
+    if (line && line.from != null) {
+      if (mode === 'rich' ? rich.current?.replaceLine(line.from, line.text, markdown) : md.current?.replaceLine(line.from, line.text, markdown)) return
+    }
+    put(markdown, 'inline')
+  }
+  const currentLine = (): Line | null => (mode === 'rich' ? rich.current?.currentLine() : md.current?.currentLine()) ?? null
+
+  const uploadFiles = async (files: File[]): Promise<string[]> => {
+    if (!note) return []
+    const out: string[] = []
+    for (const f of files) {
+      try {
+        const r = await upload<{ markdown: string }>(`${V1}/notes/${note.id}/attachments`, 'file', f)
+        out.push(r.markdown)
+      } catch (e) { toast(`${f.name}: ${(e as Error).message}`, 'err') }
+    }
+    return out
+  }
+
+  const report = async (kind: string) => {
+    toast(`Reading ${REPORTS[kind] || kind}…`)
+    try {
+      const r = await api.post<{ markdown: string; empty: boolean; message?: string }>(`${V1}/tools/report/${kind}`, {})
+      if (r.empty) toast(r.message || 'There was nothing to write down.', 'err'); else put(r.markdown, 'block')
+    } catch (e) { toast(toolError(e), 'err') }
+  }
+
+  const runTool = (tool: string, line: Line | null) => {
+    switch (tool) {
+      case 'link': setSheet({ kind: 'link' }); break
+      case 'bookmark': setSheet({ kind: 'bookmark' }); break
+      case 'task': if (!line) { toast('Write the line first, then ask again on the line below it.', 'err'); return } setSheet({ kind: 'task', line }); break
+      case 'expense': if (!line) { toast('Write the line first, then make it a transaction.', 'err'); return } setSheet({ kind: 'expense', line }); break
+      case 'habits': setSheet({ kind: 'habits' }); break
+      case 'voice': setSheet({ kind: 'voice' }); break
+      case 'camera': case 'scan': cameraInput.current?.click(); break
+      default: if (REPORTS[tool]) report(tool); else toast(`“${tool}” is not available here`, 'err')
+    }
+  }
+
+  const openLink = async (url: string, raw = url) => {
+    const wiki = /^\[\[(.+)\]\]$/.exec(raw)
+    if (wiki && note) {
+      try { const n = await api.get<Note>(`${V1}/resolve${qs({ target: wiki[1], from: note.id })}`); navigate(`/note/${n.id}${location.search}`) }
+      catch { toast(`No note is called “${wiki[1]}” yet`, 'err') }
+      return
+    }
+    const nid = noteIdIn(raw) ?? noteIdIn(url)
+    if (nid) { navigate(`/note/${nid}${location.search}`); return }
+    if (/^pockethomelab:/i.test(raw)) { window.location.href = raw; return }
+    if (!/^[a-z][a-z0-9+.-]*:/i.test(raw) && !raw.startsWith('#') && note) {
+      try {
+        const n = await api.get<Note>(`${V1}/resolve${qs({ target: decodeURIComponent(raw), from: note.id })}`)
+        navigate(`/note/${n.id}${location.search}`)
+        return
+      } catch {
+        // A file kept with the note: open it.
+        window.open(`${V1}/notes/${note.id}/attachment${qs({ path: decodeURIComponent(raw) })}`, '_blank', 'noopener')
+        return
+      }
+    }
+    window.open(url, '_blank', 'noopener')
+  }
+
+  const doExport = async (kind: 'pdf' | 'html') => {
+    if (!note) return
+    if (mode !== 'rich') { setMode('rich'); toast('Shown as rich text for the export — choose it again'); return }
+    const frame = rich.current?.frame()
+    if (!frame) return
+    try {
+      if (kind === 'pdf') await printNote(frame, note.title)
+      else await exportHTML(frame, note.title)
+    } catch (e) { toast((e as Error).message, 'err') }
+  }
+
+  const onMessage = (m: EditorMessage) => {
+    switch (m.name) {
+      case 'tool': runTool(String(m.tool), m.text ? { text: String(m.text), from: m.from as number } : currentLine()); break
+      case 'attach':
+        if (m.source === 'device') fileInput.current?.click()
+        else if (m.source === 'nextcloud') setSheet({ kind: 'files' })
+        else if (m.source === 'immich') setSheet({ kind: 'photos' })
+        break
+      case 'templates': setSheet({ kind: 'templates' }); break
+      case 'share': doExport(m.kind === 'html' ? 'html' : 'pdf'); break
+      case 'link': openLink(String(m.url), String(m.raw ?? m.url)); break
+      case 'diagram': setSheet({ kind: 'diagram', svg: String(m.svg) }); break
+      case 'code': navigator.clipboard?.writeText(String(m.code ?? '')); toast('Command copied'); break
+    }
+  }
+
+  const onRequest = async (m: EditorMessage) => {
+    if (m.name === 'notes') {
+      const list = await api.get<Note[]>(`${V1}/notes?sort=modified&limit=2000`)
+      return { notes: list.filter(n => n.id !== cur.current.id).map(n => ({ id: n.id, title: n.title || 'Untitled', folder: n.category, url: noteURL(n.id) })) }
+    }
+    return null
+  }
+
+  const offered = useMemo(() => {
+    const t = Object.entries(tools).filter(([, ok]) => ok).map(([k]) => k)
+    t.push('bookmark')
+    if (navigator.mediaDevices && 'MediaRecorder' in window) t.push('voice')
+    t.push('camera')
+    return Array.from(new Set(t))
+  }, [tools])
+
+  // ---- conflict ----
+
+  const takeTheirs = () => {
+    if (!conflict) return
+    const c = cur.current
+    c.etag = conflict.etag; c.saved = conflict.content || ''; c.draft = c.saved
+    setNote(conflict); setDraft(c.saved); setRevision(r => r + 1); setConflict(null); setStatus('saved')
+  }
+  const keepMine = async () => {
+    if (!conflict) return
+    cur.current.etag = conflict.etag
+    setConflict(null)
+    await save()
+  }
+  const mineAsCopy = async () => {
+    if (!note) return
+    const mine = cur.current.draft
+    try {
+      const copy = await api.post<Note>(`${V1}/notes`, { title: `${note.title} (my version)`, category: note.category, content: mine })
+      takeTheirs(); bump()
+      toast('Your version is kept as a new note')
+      navigate(`/note/${copy.id}${location.search}`)
+    } catch (e) { toast((e as Error).message, 'err') }
+  }
+
+  if (err) return <div className="note-empty"><div className="callout danger">{err}</div>{onBack && <button className="btn mt" onClick={onBack}>← Back</button>}</div>
+  if (!note) return <div className="note-empty"><Loading /></div>
+
+  const outline = headings(draft)
+  const words = wordCount(draft)
+  const statusText: Record<Status, string> = { saved: 'Saved', dirty: 'Editing…', saving: 'Saving…', error: 'Not saved — retrying', conflict: 'Changed elsewhere', offline: 'Offline — retrying' }
+
+  return (
+    <div className={`note-view ${panel ? 'with-panel' : ''}`}>
+      <header className="note-head">
+        {onBack && <button className="btn ghost icon back-btn" onClick={onBack} aria-label="Back">←</button>}
+        <div className="note-title-wrap">
+          <div className="crumbs small note-crumbs">
+            <Link to={`/?in=${encodeURIComponent(note.category)}`} className="muted">{note.category ? note.category.split('/').join(' › ') : 'Notes'}</Link>
+          </div>
+          <input className="note-title" value={title} onChange={e => setTitle(e.target.value)} onBlur={rename} onKeyDown={e => { if (e.key === 'Enter') { (e.target as HTMLInputElement).blur() } if (e.key === 'Escape') { setTitle(note.title); (e.target as HTMLInputElement).blur() } }} readOnly={note.readonly} aria-label="Title" />
+        </div>
+        <div className="note-actions">
+          <span className={`save-state ${status}`} title={stamp(note.modified)}>{statusText[status]}</span>
+          <button className={`btn ghost icon ${note.favorite ? 'on star' : ''}`} title={note.favorite ? 'Remove from favourites' : 'Favourite'} onClick={() => patch({ favorite: !note.favorite })}>{note.favorite ? '★' : '☆'}</button>
+          <button className={`btn ghost icon ${note.pinned ? 'on' : ''}`} title={note.pinned ? 'Unpin' : 'Pin to the top'} onClick={() => patch({ pinned: !note.pinned })}>📌</button>
+          <div className="segmented sm mode-toggle">
+            <button className={mode === 'rich' ? 'active' : ''} onClick={() => { const p = rich.current?.flush(); if (p != null) changed(p); setMode('rich'); setRevision(r => r + 1) }} title="Rich text">Aa</button>
+            <button className={mode === 'markdown' ? 'active' : ''} onClick={() => { const p = rich.current?.flush(); if (p != null) changed(p); setMode('markdown'); setRevision(r => r + 1) }} title="Markdown source">M↓</button>
+          </div>
+          <button className={`btn ghost icon ${panel ? 'on' : ''}`} title="Outline, links and info" onClick={() => setPanel(p => p ? '' : 'outline')}>☰</button>
+          <div className="menu-wrap">
+            <button className="btn ghost icon" onClick={() => setMenu(o => !o)} aria-label="More">⋯</button>
+            {menu && <div className="menu" onMouseLeave={() => setMenu(false)} onClick={() => setMenu(false)}>
+              <button onClick={() => setSheet({ kind: 'history' })}>History…</button>
+              <button onClick={() => setSheet({ kind: 'share' })}>Share a link…</button>
+              <button onClick={() => setSheet({ kind: 'move' })}>Move to…</button>
+              <button onClick={async () => { const n = await api.post<Note>(`${V1}/notes/${note.id}/duplicate`); bump(); navigate(`/note/${n.id}${location.search}`) }}>Duplicate</button>
+              <hr />
+              <button onClick={() => { navigator.clipboard?.writeText(noteURL(note.id)); toast('Link copied') }}>Copy link</button>
+              <a href={`${V1}/notes/${note.id}/download`}>Download .md</a>
+              <button onClick={() => doExport('pdf')}>Print / PDF</button>
+              <button onClick={() => doExport('html')}>Export HTML</button>
+              <hr />
+              <button className="danger-text" onClick={() => setSheet({ kind: 'delete' })}>Delete</button>
+            </div>}
+          </div>
+        </div>
+      </header>
+
+      {note.tags.length > 0 && <div className="note-tags">{note.tags.map(t => <Link key={t} to={`/?tag=${encodeURIComponent(t)}`} className="tag">#{t}</Link>)}</div>}
+
+      {conflict && <div className="callout warning conflict">
+        <b>This note was changed somewhere else</b> (another device or app) while you were writing here.
+        <div className="row wrap mt-s">
+          <button className="btn sm" onClick={takeTheirs}>Show theirs (drop mine)</button>
+          <button className="btn sm" onClick={mineAsCopy}>Keep mine as a copy</button>
+          <button className="btn sm danger" onClick={keepMine}>Overwrite with mine</button>
+        </div>
+      </div>}
+
+      {mode === 'markdown' && <MdToolbar ed={md} onTool={t => runTool(t, currentLine())} onAttach={s => onMessage({ name: 'attach', source: s })} onTemplates={() => setSheet({ kind: 'templates' })} tools={offered} />}
+
+      <div className="note-body">
+        <div className="editor-pane">
+          {mode === 'rich'
+            ? <RichEditor ref={rich} docKey={String(note.id)} revision={revision} content={draft} noteID={note.id} readonly={note.readonly} checkable tools={offered} theme={theme}
+                spellcheck={settings?.spellcheck} placeholder="Write, or type / for blocks and homelab tools" onChange={changed} onMessage={onMessage} onRequest={onRequest}
+                onFailed={msg => { toast(`The rich editor could not open this note (${msg}); showing Markdown.`, 'err'); setMode('markdown') }} />
+            : <MarkdownEditor ref={md} docKey={String(note.id)} revision={revision} content={draft} readonly={note.readonly} spellcheck={settings?.spellcheck} onChange={changed} onPasteFiles={uploadFiles} onOpenLink={u => openLink(u)} />}
+        </div>
+        {panel && <aside className="note-panel">
+          <div className="segmented sm mb">
+            <button className={panel === 'outline' ? 'active' : ''} onClick={() => setPanel('outline')}>Outline</button>
+            <button className={panel === 'links' ? 'active' : ''} onClick={() => setPanel('links')}>Links</button>
+            <button className={panel === 'info' ? 'active' : ''} onClick={() => setPanel('info')}>Info</button>
+          </div>
+          {panel === 'outline' && (outline.length ? <ul className="outline">{outline.map((h, i) => <li key={i} style={{ paddingLeft: (h.level - 1) * 12 }}><button onClick={() => mode === 'rich' ? rich.current?.scrollToHeading(h.text, outline.slice(0, i).filter(x => x.text === h.text).length) : md.current?.scrollToLine(h.line)}>{h.text}</button></li>)}</ul> : <p className="muted small">No headings in this note.</p>)}
+          {panel === 'links' && <Backlinks id={note.id} etag={note.etag} />}
+          {panel === 'info' && <Info note={note} words={words} chars={draft.length} />}
+        </aside>}
+      </div>
+
+      <footer className="note-foot muted small">
+        <span>{words} words</span><span>·</span><span>{Math.max(1, Math.round(words / 220))} min read</span>
+        {note.tasks_open + note.tasks_done > 0 && <><span>·</span><span>{note.tasks_done}/{note.tasks_open + note.tasks_done} tasks</span></>}
+        <span className="spacer" />
+        <span title={stamp(note.modified)}>Edited {ago(note.modified)}</span>
+      </footer>
+
+      <input ref={fileInput} type="file" multiple hidden onChange={async e => { const f = Array.from(e.target.files || []); e.target.value = ''; for (const m of await uploadFiles(f)) put(m, 'block') }} />
+      <input ref={cameraInput} type="file" accept="image/*" capture="environment" hidden onChange={async e => { const f = Array.from(e.target.files || []); e.target.value = ''; for (const m of await uploadFiles(f)) put(m, 'block') }} />
+
+      {sheet?.kind === 'link' && <LinkPicker onClose={() => setSheet(null)} onPick={m => { setSheet(null); put(m, 'inline') }} />}
+      {sheet?.kind === 'bookmark' && <BookmarkSheet onClose={() => setSheet(null)} onPick={m => { setSheet(null); put(m, 'inline') }} />}
+      {sheet?.kind === 'photos' && <PhotoPicker noteID={note.id} onClose={() => setSheet(null)} onPick={m => { setSheet(null); put(m, 'block') }} />}
+      {sheet?.kind === 'files' && <FilesPicker noteID={note.id} onClose={() => setSheet(null)} onPick={m => { setSheet(null); put(m, 'block') }} />}
+      {sheet?.kind === 'task' && <TaskSheet line={sheet.line?.text || ''} onClose={() => setSheet(null)} onDone={m => { const l = sheet.line; setSheet(null); replaceLine(l, m); toast('Sent') }} />}
+      {sheet?.kind === 'expense' && <ExpenseSheet line={sheet.line?.text || ''} onClose={() => setSheet(null)} onDone={m => { const l = sheet.line; setSheet(null); replaceLine(l, m); toast('Booked') }} />}
+      {sheet?.kind === 'habits' && <HabitsSheet onClose={() => setSheet(null)} onDone={m => { setSheet(null); put(m, 'block') }} />}
+      {sheet?.kind === 'voice' && <VoiceMemo upload={async f => (await uploadFiles([f]))[0] || ''} onClose={() => setSheet(null)} onDone={m => { setSheet(null); put(m, 'block') }} />}
+      {sheet?.kind === 'templates' && <TemplatePicker onClose={() => setSheet(null)} onPick={m => { setSheet(null); if (mode === 'rich') rich.current?.insertTemplate(m); else put(m, 'block') }} />}
+      {sheet?.kind === 'diagram' && <DiagramViewer svg={sheet.svg} onClose={() => setSheet(null)} />}
+      {sheet?.kind === 'history' && <HistoryModal note={note} onClose={() => setSheet(null)} onRestored={n => { const c = cur.current; c.etag = n.etag; c.saved = n.content || ''; c.draft = c.saved; setNote(n); setDraft(c.saved); setRevision(r => r + 1); setSheet(null); toast('Restored') }} />}
+      {sheet?.kind === 'share' && <ShareModal note={note} onClose={() => setSheet(null)} />}
+      {sheet?.kind === 'move' && <MoveModal current={note.category} onClose={() => setSheet(null)} onMove={async cat => { setSheet(null); await patch({ category: cat }, `Moved to ${cat || 'Notes'}`) }} />}
+      {sheet?.kind === 'delete' && <Confirm title={`Delete “${note.title}”?`} message={<>It goes to the trash (Trash in the sidebar) for {settings?.trash_days ?? 30} days{settings?.storage_kind === 'nextcloud' ? ', and to Nextcloud’s own trash bin' : ''}.</>} onCancel={() => setSheet(null)} onConfirm={async () => { setSheet(null); cur.current.draft = cur.current.saved; await api.del(`${V1}/notes/${note.id}`); bump(); toast('Moved to the trash'); navigate(`/${location.search}`) }} />}
+    </div>
+  )
+}
+
+function MdToolbar({ ed, onTool, onAttach, onTemplates, tools }: { ed: React.RefObject<MarkdownEditorHandle | null>; onTool: (t: string) => void; onAttach: (s: string) => void; onTemplates: () => void; tools: string[] }) {
+  const [open, setOpen] = useState(false)
+  const b = (label: string, title: string, fn: () => void) => <button className="btn ghost sm" title={title} onMouseDown={e => e.preventDefault()} onClick={fn}>{label}</button>
+  const items: [string, string][] = [['link', 'Link to something…'], ['bookmark', 'Web bookmark…'], ['task', 'Make this line a task…'], ['expense', 'Make this line a transaction…'], ['snapshot', 'Homelab snapshot'], ['attention', 'What needs attention'], ['media', 'Watched and listened this week'], ['spent', 'Spending this month'], ['fuel', 'Vehicle log'], ['hosts', 'Hosts on the network'], ['processes', 'Server processes'], ['habits', 'Days of habits…'], ['voice', 'Voice memo…'], ['camera', 'Take a photo…']]
+  return (
+    <div className="md-toolbar">
+      {b('B', 'Bold (⌘B)', () => ed.current?.wrap('**'))}
+      {b('I', 'Italic (⌘I)', () => ed.current?.wrap('*'))}
+      {b('S̶', 'Strikethrough', () => ed.current?.wrap('~~'))}
+      {b('</>', 'Code', () => ed.current?.wrap('`'))}
+      <span className="sep" />
+      {b('H1', 'Heading 1', () => ed.current?.linePrefix('# '))}
+      {b('H2', 'Heading 2', () => ed.current?.linePrefix('## '))}
+      {b('H3', 'Heading 3', () => ed.current?.linePrefix('### '))}
+      <span className="sep" />
+      {b('•', 'Bulleted list', () => ed.current?.linePrefix('- '))}
+      {b('1.', 'Numbered list', () => ed.current?.linePrefix('1. '))}
+      {b('☐', 'Task', () => ed.current?.linePrefix('- [ ] '))}
+      {b('❝', 'Quote', () => ed.current?.linePrefix('> '))}
+      {b('🔗', 'Link (⌘K)', () => ed.current?.wrap('[', '](https://)'))}
+      {b('▦', 'Table', () => ed.current?.insert('| Column | Column |\n| --- | --- |\n|  |  |', true))}
+      {b('{ }', 'Code block', () => ed.current?.insert('```\n\n```', true))}
+      <span className="sep" />
+      {b('📎', 'Attach a file', () => onAttach('device'))}
+      {b('🖼', 'From Photos (Immich)', () => onAttach('immich'))}
+      {b('☁', 'From Nextcloud', () => onAttach('nextcloud'))}
+      {b('📋', 'My templates', onTemplates)}
+      <div className="menu-wrap">
+        <button className="btn ghost sm" onClick={() => setOpen(o => !o)}>Homelab ▾</button>
+        {open && <div className="menu" onMouseLeave={() => setOpen(false)} onClick={() => setOpen(false)}>
+          {items.filter(([k]) => tools.includes(k)).map(([k, l]) => <button key={k} onClick={() => onTool(k)}>{l}</button>)}
+        </div>}
+      </div>
+    </div>
+  )
+}
+
+function Backlinks({ id, etag }: { id: number; etag: string }) {
+  const [data, setData] = useState<{ backlinks: Note[]; mentions: Note[] } | null>(null)
+  useEffect(() => { api.get<{ backlinks: Note[]; mentions: Note[] }>(`${V1}/notes/${id}/backlinks`).then(setData).catch(() => setData({ backlinks: [], mentions: [] })) }, [id, etag])
+  if (!data) return <Loading />
+  return (
+    <div className="links-panel">
+      <h4>Linked from</h4>
+      {data.backlinks.length ? data.backlinks.map(n => <Link key={n.id} className="mini-note" to={`/note/${n.id}${location.search}`}><b>{n.title}</b><small className="muted">{n.category || 'Notes'} · {ago(n.modified)}</small></Link>) : <p className="muted small">No note links here yet. Type <code>[[</code> in another note to link to this one.</p>}
+      {data.mentions.length > 0 && <><h4 className="mt">Mentioned in</h4>{data.mentions.map(n => <Link key={n.id} className="mini-note" to={`/note/${n.id}${location.search}`}><b>{n.title}</b><small className="muted">{n.category || 'Notes'}</small></Link>)}</>}
+    </div>
+  )
+}
+
+function Info({ note, words, chars }: { note: Note; words: number; chars: number }) {
+  const { sync } = useApp()
+  return (
+    <table className="table compact info">
+      <tbody>
+        <tr><th>File</th><td className="mono small">{note.path}</td></tr>
+        <tr><th>Folder</th><td>{note.category ? <Link to={`/?in=${encodeURIComponent(note.category)}`}>{leaf(note.category)}</Link> : 'Notes'}</td></tr>
+        <tr><th>Stored</th><td>{sync?.where || '—'}</td></tr>
+        <tr><th>Edited</th><td>{stamp(note.modified)}</td></tr>
+        <tr><th>Created</th><td>{stamp(note.created_at)}</td></tr>
+        <tr><th>Words</th><td>{words} · {chars} characters</td></tr>
+        <tr><th>Tasks</th><td>{note.tasks_open} open · {note.tasks_done} done</td></tr>
+        <tr><th>Tags</th><td>{note.tags.length ? note.tags.map(t => <Link key={t} to={`/?tag=${encodeURIComponent(t)}`} className="tag">#{t}</Link>) : '—'}</td></tr>
+        <tr><th>Id</th><td className="mono small">{note.id}</td></tr>
+      </tbody>
+    </table>
+  )
+}

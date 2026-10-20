@@ -26,9 +26,10 @@ jobs:
           DATA_DIR=/tmp/pp DEMO_DATA=true AUTH_MODE=none ./pocket-notes &
           sleep 2
           curl -fsS http://localhost:8080/healthz
-          curl -fsS http://localhost:8080/api/v1/dashboard | grep -q listened_today_min
-          curl -fsS "http://localhost:8080/api/v1/episodes?status=unplayed" | grep -q '"podcast_title"'
-          curl -fsS http://localhost:8080/api/v1/stats | grep -q top_podcasts
+          curl -fsS http://localhost:8080/api/v1/dashboard | grep -q open_tasks
+          curl -fsS "http://localhost:8080/api/v1/search?q=server" | grep -q '"snippet"'
+          curl -fsS http://localhost:8080/index.php/apps/notes/api/v1/notes | grep -q '"category"'
+          curl -fsS http://localhost:8080/editor.html | grep -q 'id="editor"'
           curl -fsS http://localhost:8080/ | grep -q '<div id="root">'
   docker:
     runs-on: ubuntu-latest

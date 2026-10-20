@@ -13,9 +13,11 @@ services:
       # ADMIN_PASSWORD: ${ADMIN_PASSWORD}
       # SECURE_COOKIES: "true"          # behind HTTPS
       # AUTH_MODE: proxy                # trust Remote-User from Authelia / Authentik / Tinyauth
-      # PODCASTINDEX_KEY: …             # optional second search directory (free key)
-      # PODCASTINDEX_SECRET: …
-      # NOTIFY_URL: http://apprise:8000/notify/podcasts   # new-episode notifications (NOTIFY_KIND apprise|ntfy|webhook)
-      # DEMO_DATA: "true"               # seed a few made-up shows into an empty database
+      # STORAGE_ROOTS: /notes           # folders people may keep their notes in (mount them below)
+      # NOTIFY_URL: http://apprise:8000/notify/notes   # when a notes folder stops answering
+      # CORE_URL: http://pocket-core:8080              # Pocket Core: sign-in, integrations, events
+      # CORE_REGISTRATION_KEY: …
+      # DEMO_DATA: "true"               # seed a few made-up notes into an empty box
     volumes:
-      - ./data:/data                    # database, downloaded episodes (data/media), artwork
+      - ./data:/data                    # database (index, history, trash) and the built-in notes folder
+      # - /mnt/nas/notes:/notes         # a folder offered through STORAGE_ROOTS

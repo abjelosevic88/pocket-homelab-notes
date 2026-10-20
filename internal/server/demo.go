@@ -22,7 +22,7 @@ func (s *Server) seedDemo(ctx context.Context) error {
 	today := time.Now()
 	day := func(d int) string { return today.AddDate(0, 0, d).Format("2006-01-02") }
 	notes := []struct{ cat, title, body string }{
-		{"", "Welcome", "# Welcome\n\nThis is **Pocket Notes**: Markdown notes kept as plain files where you choose.\n\n- Type `/` in the editor for blocks, diagrams, templates and homelab tools\n- Link notes with [[Server rebuild]] or [[Reading list]]\n- Tag anything with #ideas or #homelab\n\n> [!TIP]\n> Settings → Storage moves your notes to Nextcloud, WebDAV or a folder on the server.\n"},
+		{"", "Welcome", "# Welcome\n\nThis is **Pocket Notes**: Markdown notes kept as plain files where you choose.\n\n- Type `/` in the editor for blocks, diagrams, templates and homelab tools\n- Link notes with [[Server rebuild]] or [[Reading list]]\n- Tag anything with #ideas or #homelab\n\n::: info\nSettings → Storage moves your notes to Nextcloud, WebDAV or a folder on the server.\n:::\n"},
 		{"Projects", "Server rebuild", "# Server rebuild\n\nPlan for the new box. #homelab\n\n## To do\n\n- [x] Order the case\n- [ ] Move Immich to the NVMe 📅 " + day(2) + "\n- [ ] Re-check the backup plan due:" + day(-1) + "\n- [ ] Write the runbook\n\n## Notes\n\n```mermaid\nflowchart LR\n  NAS --> Server --> Backups\n```\n\nSee also [[Reading list]].\n"},
 		{"Projects", "Garden", "# Garden\n\n| Bed | Plant | Sown |\n| --- | --- | --- |\n| A | Tomatoes | " + day(-30) + " |\n| B | Basil | " + day(-21) + " |\n\n- [ ] Water on Sunday\n- [ ] Order compost #home\n"},
 		{"Reading", "Reading list", "# Reading list\n\n- [ ] *The Pragmatic Programmer*\n- [x] *Designing Data-Intensive Applications*\n- [ ] *A Philosophy of Software Design* #ideas\n"},

@@ -1,10 +1,10 @@
 {
   "name": "Pocket Notes",
-  "short_name": "Podcasts",
+  "short_name": "Notes",
   "start_url": "/",
   "display": "standalone",
-  "background_color": "#f5f6f8",
-  "theme_color": "#ea580c",
+  "background_color": "#f6f5f1",
+  "theme_color": "#ca8a04",
   "icons": [
     {
       "src": "/favicon.svg",

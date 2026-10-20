@@ -1,0 +1,27 @@
+import { useEffect, useRef, useState } from 'react'
+import { useParams } from 'react-router-dom'
+import { stamp } from '../lib/format'
+import { Loading } from '../components/ui'
+import { RichEditor, type RichEditorHandle } from '../components/RichEditor'
+
+// A shared note, read-only, for anyone with the link.
+export default function Share() {
+  const { token = '' } = useParams()
+  const [note, setNote] = useState<{ title: string; content: string; modified: number; author: string } | null>(null)
+  const [err, setErr] = useState('')
+  const ed = useRef<RichEditorHandle>(null)
+  const theme = (localStorage.getItem('pn-theme') as 'light' | 'dark') || (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light')
+  useEffect(() => {
+    document.documentElement.dataset.theme = theme
+    fetch(`/api/public/share/${encodeURIComponent(token)}`).then(async r => { const j = await r.json(); if (!r.ok) throw new Error(j.error || 'Not found'); setNote(j); document.title = j.title }).catch(e => setErr((e as Error).message))
+  }, [token]) // eslint-disable-line react-hooks/exhaustive-deps
+  if (err) return <div className="share-page"><div className="callout danger">{err}</div></div>
+  if (!note) return <div className="share-page"><Loading /></div>
+  return (
+    <div className="share-page">
+      <header className="share-head"><h1>{note.title}</h1><p className="muted small">{note.author && <>Shared by {note.author} · </>}edited {stamp(note.modified)}</p></header>
+      <div className="share-body"><RichEditor ref={ed} docKey={token} revision={1} content={note.content} share={token} readonly theme={theme} /></div>
+      <footer className="muted small center">Pocket Notes</footer>
+    </div>
+  )
+}

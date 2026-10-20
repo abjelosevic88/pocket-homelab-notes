@@ -373,8 +373,8 @@ func (s *Store) Tags(ctx context.Context, userID int64) ([]TagCount, error) {
 func (s *Store) Backlinks(ctx context.Context, userID int64, n *Note) ([]Note, error) {
 	targets := []any{userID, strings.ToLower(n.Title), "path:" + strings.ToLower(n.Path)}
 	rows, err := s.DB.QueryContext(ctx, `SELECT `+noteCols+` FROM notes WHERE user_id = ? AND id <> ? AND id IN
-		(SELECT note_id FROM note_links WHERE user_id = ? AND (target = ? OR target = ? OR target = ? OR target LIKE ? ESCAPE '\'))
-		ORDER BY modified DESC LIMIT 100`, userID, n.ID, targets[0], targets[1], targets[2], "path:"+strings.ToLower(lastPart(n.Path)), "path:%/"+likeEscape(strings.ToLower(lastPart(n.Path))))
+		(SELECT note_id FROM note_links WHERE user_id = ? AND (target = ? OR target = ? OR target = ? OR target = ? OR target LIKE ? ESCAPE '\'))
+		ORDER BY modified DESC LIMIT 100`, userID, n.ID, targets[0], targets[1], targets[2], "id:"+strconv.FormatInt(n.ID, 10), "path:"+strings.ToLower(lastPart(n.Path)), "path:%/"+likeEscape(strings.ToLower(lastPart(n.Path))))
 	if err != nil {
 		return nil, err
 	}

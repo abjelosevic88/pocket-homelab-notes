@@ -1,5 +1,5 @@
 VERSION ?= $(shell git describe --tags --always --dirty 2>/dev/null || echo dev)
-IMAGE   ?= ghcr.io/abjelosevic88/pocket-homelab-bookshelf
+IMAGE   ?= ghcr.io/abjelosevic88/pocket-homelab-notes
 LDFLAGS  = -s -w -X main.version=$(VERSION)
 
 .PHONY: all web build run dev test lint docker docker-multiarch backup clean help
@@ -30,7 +30,7 @@ docker:                    ## build the container image for the local platform
 	docker build --build-arg VERSION=$(VERSION) -t $(IMAGE):$(VERSION) -t $(IMAGE):latest .
 
 docker-multiarch:          ## build & push amd64 + arm64 + armv7 (needs buildx)
-	docker buildx build --platform linux/amd64,linux/arm64,linux/arm/v7 --build-arg VERSION=$(VERSION) -t $(IMAGE):$(VERSION) -t $(IMAGE):latest --push .
+	docker buildx build --platform linux/amd64,linux/arm64 --build-arg VERSION=$(VERSION) -t $(IMAGE):$(VERSION) -t $(IMAGE):latest --push .
 
 backup:                    ## snapshot the local database
 	./pocket-notes backup

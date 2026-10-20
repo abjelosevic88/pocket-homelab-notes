@@ -43,7 +43,7 @@ export default function Login({ mode }: { mode: 'login' | 'setup' }) {
             <button className={`btn lg ${sso ? '' : 'primary'}`} disabled={busy}>{busy ? 'Please wait…' : mode === 'setup' ? 'Create account' : 'Sign in'}</button>
           </form>
         </Card>
-        {mode === 'setup' && <p className="muted small mt">You become the admin. Others get their own subscriptions under Settings → Users, or sign in with Pocket Core.</p>}
+        {mode === 'setup' && <p className="muted small mt">You become the admin. Others get their own notes under Settings → Users, or sign in with Pocket Core.</p>}
         {status?.version && <p className="muted small right mt">v{status.version.replace(/^v/, '')}</p>}
       </div>
     </div>

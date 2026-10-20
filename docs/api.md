@@ -1,53 +1,63 @@
-# API
+# HTTP API
 
-Base path `/api/v1`. JSON in and out. Authenticate with the browser session or `Authorization: Bearer <token>` (Settings → API tokens; a token acts as the person who made it). Pocket Core device tokens (`pcd_`) and link tokens (`pcx_`, scopes `podcasts:read`, `history:read`, `queue:write`) are accepted when `CORE_URL` is set.
+Everything the web app does goes through `/api/v1`. Authenticate with the session cookie, with
+`Authorization: Bearer <token>` (Settings → Apps & API), or with Basic auth (`email:token`).
+Add `X-Pocket-Source: shortcut` (or `app`) to have your changes named so in a note's history.
 
-## Discovery
-- `GET /search?q=&source=all|itunes|podcastindex` → `{results[], warnings[]}`; results carry `subscribed_id` when already followed.
-- `GET /search/trending?lang=` (Podcast Index key needed).
-- `POST /preview {url}` → what a feed / YouTube channel / playlist / video is before subscribing.
+## Notes
 
-## Subscriptions
-- `GET /podcasts?q=&kind=rss|youtube&sort=title|recent|unplayed|added`
-- `POST /podcasts {url, title?, auto_download?, download_limit?, retention_days?, min_duration?, title_filter?, notify?, playback_speed?, pub_date_mode?}` — a feed URL or a YouTube channel/playlist URL. Indexes synchronously, returns the podcast.
-- `GET /podcasts/{id}` · `PUT /podcasts/{id}` (any subset of the settings) · `DELETE /podcasts/{id}`
-- `POST /podcasts/{id}/refresh` → `{new, podcast}` · `POST /refresh` (all, in the background)
-- `POST /podcasts/{id}/favorite {favorite}` · `POST /podcasts/{id}/played {played}` · `POST /podcasts/{id}/download {count}` · `DELETE /podcasts/{id}/files?played=1`
-- `GET /podcasts/{id}/episodes?…` (same filters as `/episodes`)
-- `GET|POST|DELETE /podcasts/{id}/artwork` (POST: multipart `file` or JSON `{url}`)
-- `POST /youtube/video {url}` → downloads one video into your "Picks" show.
-- `POST /picks {feed_url, guid|title, download?}` → one episode of any feed into your "Picks" show (no subscription), downloaded unless `download: false`. `guid` comes from `/preview`.
+| | |
+| --- | --- |
+| `GET /notes?category=&recursive=1&tag=&favorite=1&pinned=1&tasks=1&sort=modified\|title\|created\|opened&limit=&since=` | notes without their text, `excerpt`, `tags`, task counts |
+| `POST /notes {title?, category?, content?, favorite?, pinned?, template_id?}` | a new note; no title → its first line |
+| `GET /notes/{id}` | with `content` and `etag` (re-read from the storage when it changed there) |
+| `PUT /notes/{id} {content?, title?, category?, favorite?, pinned?, etag?}` | `etag` (or `If-Match`) guards against overwriting; 409 + `{note}` when it changed |
+| `DELETE /notes/{id}` | to the trash |
+| `POST /notes/{id}/append {text}` | adds a line or block at the end |
+| `POST /notes/{id}/tasks {line, text, done}` | ticks a checkbox |
+| `POST /notes/{id}/duplicate` | |
+| `GET /notes/{id}/backlinks` | `{backlinks, mentions}` |
+| `GET /notes/{id}/versions`, `GET …/versions/{vid}`, `POST …/versions/{vid}/restore` | history with a line diff against now |
+| `POST /notes/{id}/attachments` (multipart `file`) | `{path, markdown}` |
+| `GET /notes/{id}/attachment?path=` | a file the note links to |
+| `GET/POST /notes/{id}/shares {days?}`, `GET /shares`, `DELETE /shares/{id}` | public read-only links (`/s/<token>`) |
+| `GET /notes/{id}/download` | the Markdown file |
 
-## Episodes
-- `GET /episodes?q=&status=unplayed|partial|played|unfinished&downloaded=1|0&days=&kind=&podcast=&min_duration=&max_duration=&sort=newest|oldest|shortest|longest&limit=&offset=` → `{episodes[], total}`
-- `GET /episodes/{id}` → episode with `chapters[]` and `sponsors[]`
-- `GET /episodes/{id}/stream` — the downloaded file with range support (`?download=1` as attachment); redirects to the enclosure when not downloaded.
-- `GET /episodes/{id}/artwork`
-- `POST /episodes/{id}/progress {position, listened, duration?, completed?}` — called by the player every ~10 s; `listened` seconds feed the stats.
-- `POST|DELETE /episodes/{id}/played` · `DELETE /episodes/{id}/history`
-- `POST|DELETE /episodes/{id}/download` · `POST|DELETE /episodes/{id}/queue` (`{front: true}` = play next) · `POST|DELETE /episodes/{id}/save`
-- `DELETE /episodes/{id}`
+## Finding
 
-## Lists
-- `GET /home` — everything the Home page shows.
-- `GET /queue` · `PUT /queue {ids[]}` · `DELETE /queue` · `GET /queue/next?after=`
-- `GET /history?limit=&offset=` · `DELETE /history`
-- `GET /saved` · `GET /downloads` → `{pending[], done[], bytes, yt_dlp}`
-- `GET|POST /playlists` · `GET|PUT|DELETE /playlists/{id}` · `GET /playlists/{id}/episodes`
+| | |
+| --- | --- |
+| `GET /search?q=` | full text, best first, `snippet` with `[[[found]]]` marks. Filters: `tag:x`, `#x`, `in:Folder`, `is:fav`, `is:pinned`, `has:tasks`, `"a phrase"` |
+| `GET /suggest?q=` | titles, for completion |
+| `GET /resolve?target=&from=` | the note a `[[link]]` or relative path means |
+| `GET /folders`, `POST /folders {path}`, `PUT /folders {from, to}`, `DELETE /folders?path=` | |
+| `GET /tags`, `GET /tasks?state=open\|done\|all` | |
 
-## You
-- `GET /dashboard` — compact numbers for widgets (Homepage `customapi`): `podcasts, unplayed, queued, downloaded, downloaded_mb, listened_today_min, listened_week_min, now_playing, next_up, new_today, downloads_pending`.
-- `GET /stats` · `GET /activity?kind=&limit=`
-- `GET|PUT /settings` · `GET /settings/system` · `POST /settings/notify/test` · `POST /settings/feed-key` · `POST /settings/ytdlp/update` (admin)
-- `GET /auth/me` · `PUT /auth/me` · `GET /tokens` · `POST /tokens {name}` · `DELETE /tokens/{id}`
-- `GET /export.opml` · `GET /export.json` · `POST /import/opml` (multipart `file` or raw body) · `POST /import` (the JSON export) · `GET /backup` (admin)
+## Days
 
-## Public feeds (no login)
-- `GET /feed/{key}/` — HTML index of your feeds
-- `GET /feed/{key}/{podcast}.xml` — RSS 2.0 with itunes tags; YouTube feeds list downloaded episodes only
-- `GET /feed/{key}/e/{episode}.m4a` (any extension), `/feed/{key}/e/{episode}/chapters.json`, `/feed/{key}/art/{podcast}.jpg`, `/feed/{key}/art/e/{episode}.jpg`
+| | |
+| --- | --- |
+| `GET /daily?date=YYYY-MM-DD` / `POST /daily {date?}` | today's (or a day's) daily note; POST makes it from the template |
+| `POST /capture {text, date?, note_id?, raw?}` or `text/plain` body | `- 9:12 text` into today's note (format in Settings) |
+| `GET /calendar?month=YYYY-MM` | days with a daily note and how many notes were edited |
+| `GET /templates` | the notes in the templates folder |
 
-The key is in Settings → Public feeds. Feed URLs use `feed_base_url` (Settings) or `BASE_URL`.
+## The rest
 
-## Health
-`GET /healthz`, `GET /readyz`, `GET /metrics`.
+`GET /dashboard` (Homepage: `notes`, `edited_today`, `open_tasks`, `due_tasks`, `last_sync` …),
+`GET/PUT /storage`, `POST /storage/test`, `POST /sync`, `GET/PUT /settings`, `GET /trash`,
+`POST /trash/{id}/restore`, `GET /export.zip`, `POST /import` (files or a zip), `GET /backup` (admin),
+`GET /integrations`, `PUT /integrations/{svc|app}/{name}`, `GET /tools` and the homelab tools under
+`/tools/…` (link search, bookmark, Immich photos, Nextcloud files, reports, task, expense).
+
+## Shortcuts
+
+```sh
+# A line into today's note
+curl -X POST https://notes.example.com/api/v1/capture -H "Authorization: Bearer $TOKEN" \
+  -H 'Content-Type: text/plain' --data 'Call the plumber'
+
+# A note from stdin
+jq -n --arg c "$(cat)" '{title:"From the terminal", category:"Inbox", content:$c}' |
+  curl -X POST https://notes.example.com/api/v1/notes -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json' -d @-
+```

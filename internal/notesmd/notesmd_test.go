@@ -23,12 +23,13 @@ func TestAnalyze(t *testing.T) {
 		"- [ ] not a task",
 		"```",
 		"`#inline` stays out",
+		"[Other](https://cloud.bjelke.org/index.php/apps/notes/note/401450) and [x](/note/7)",
 	}, "\n")
 	in := Analyze(note)
 	if want := []string{"athena", "chatbot/core", "heading-tag", "memory", "work"}; !reflect.DeepEqual(in.Tags, want) {
 		t.Errorf("tags %v", in.Tags)
 	}
-	if want := []string{"memory and context ff"}; !reflect.DeepEqual(in.Links, want) {
+	if want := []string{"id:401450", "id:7", "memory and context ff"}; !reflect.DeepEqual(in.Links, want) {
 		t.Errorf("links %v", in.Links)
 	}
 	if len(in.Tasks) != 3 || in.Tasks[0].Due != "2026-10-21" || in.Tasks[0].Line != 7 || !in.Tasks[1].Done || in.Tasks[1].Indent != 2 || in.Tasks[2].Due != "2026-11-01" {

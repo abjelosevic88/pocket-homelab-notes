@@ -59,9 +59,15 @@ var directFields = map[string][2]string{
 }
 
 // errNotConnected is a tool asked for a service the person has not connected.
-type errNotConnected struct{ Name string }
+type errNotConnected struct {
+	Name string
+	Msg  string // why, when Pocket Core said
+}
 
 func (e errNotConnected) Error() string {
+	if e.Msg != "" {
+		return e.Msg
+	}
 	return serviceNames[e.Name] + " is not connected. Settings → Integrations connects it."
 }
 
@@ -122,7 +128,7 @@ func (s *Server) service(ctx context.Context, uid int64, typ string) (*svcCred, 
 		kv := s.store.UserSettingsPrefix(ctx, uid, "svc."+typ+".")
 		u := strings.TrimRight(kv["svc."+typ+".url"], "/")
 		if u == "" {
-			return nil, errNotConnected{typ}
+			return nil, errNotConnected{Name: typ}
 		}
 		c := &svcCred{Type: typ, URL: u, PublicURL: strings.TrimRight(firstNonEmpty(kv["svc."+typ+".public_url"], u), "/"), Key: kv["svc."+typ+".key"], Source: "direct", Fields: map[string]string{}}
 		user := kv["svc."+typ+".user"]
@@ -144,13 +150,13 @@ func (s *Server) service(ctx context.Context, uid int64, typ string) (*svcCred, 
 		if err != nil {
 			var le *core.LinkError
 			if errors.As(err, &le) {
-				return nil, fmt.Errorf("%s through Pocket Core: %s", serviceNames[typ], le.Message)
+				return nil, errNotConnected{Name: typ, Msg: fmt.Sprintf("%s through Pocket Core: %s", serviceNames[typ], le.Message)}
 			}
 			return nil, fmt.Errorf("%s through Pocket Core: %w", serviceNames[typ], err)
 		}
 		return &svcCred{Type: typ, URL: strings.TrimRight(cred.URL, "/"), PublicURL: strings.TrimRight(firstNonEmpty(cred.PublicURL, cred.URL), "/"), Key: cred.Key, Fields: cred.Fields, Source: "core"}, nil
 	}
-	return nil, errNotConnected{typ}
+	return nil, errNotConnected{Name: typ}
 }
 
 // appToken returns the address of a Pocket app and a token that acts for the
@@ -161,7 +167,7 @@ func (s *Server) appToken(ctx context.Context, uid int64, app string, scopes ...
 		u := strings.TrimRight(s.store.UserSetting(ctx, uid, "app."+app+".url"), "/")
 		t := s.store.UserSetting(ctx, uid, "app."+app+".key")
 		if u == "" || t == "" {
-			return "", "", errNotConnected{app}
+			return "", "", errNotConnected{Name: app}
 		}
 		return u, t, nil
 	case "core":
@@ -169,13 +175,13 @@ func (s *Server) appToken(ctx context.Context, uid int64, app string, scopes ...
 		if err != nil {
 			var le *core.LinkError
 			if errors.As(err, &le) {
-				return "", "", fmt.Errorf("%s through Pocket Core: %s", serviceNames[app], le.Message)
+				return "", "", errNotConnected{Name: app, Msg: fmt.Sprintf("%s through Pocket Core: %s", serviceNames[app], le.Message)}
 			}
 			return "", "", fmt.Errorf("%s through Pocket Core: %w", serviceNames[app], err)
 		}
 		return strings.TrimRight(lt.URL, "/"), lt.AccessToken, nil
 	}
-	return "", "", errNotConnected{app}
+	return "", "", errNotConnected{Name: app}
 }
 
 // appPublicURL is where people open a Pocket app (for links in notes).
@@ -498,25 +504,66 @@ var toolNeeds = map[string][]string{
 	"expense":   {"app:money"},
 }
 
+// connected reports whether a person can reach a service ("svc") or app
+// ("app") now: an address typed in, or an account Pocket Core holds for them.
+func (s *Server) connected(ctx context.Context, uid int64, kind, name string) bool {
+	switch s.integrationMode(ctx, uid, kind, name) {
+	case "direct":
+		return s.store.UserSetting(ctx, uid, kind+"."+name+".url") != ""
+	case "core":
+		email := s.userEmail(ctx, uid)
+		if kind == "app" {
+			var scopes []string
+			for _, u := range linkUses {
+				if u.App == name {
+					scopes = u.Scopes
+				}
+			}
+			on, _ := s.core.LinkOn(ctx, email, name, scopes...)
+			return on
+		}
+		_, err := s.core.ServiceFor(ctx, email, name)
+		return err == nil
+	}
+	return false
+}
+
 // handleToolsAvailable lists the tools this person can use now: a tool is
-// offered when one of the things it reads from is connected (not "off").
-// Whether the key works shows when the tool runs.
+// offered when one of the things it reads from is connected.
 func (s *Server) handleToolsAvailable(w http.ResponseWriter, r *http.Request) {
 	ctx, uid := r.Context(), me(r)
-	out := map[string]bool{}
+	cctx, cancel := context.WithTimeout(ctx, 6*time.Second)
+	defer cancel()
+	needs := map[string]bool{}
+	for _, list := range toolNeeds {
+		for _, n := range list {
+			needs[n] = false
+		}
+	}
 	var mu sync.Mutex
-	for tool, needs := range toolNeeds {
-		ok := len(needs) == 0
-		for _, n := range needs {
+	var wg sync.WaitGroup
+	for n := range needs {
+		wg.Add(1)
+		go func(n string) {
+			defer wg.Done()
 			kind, name, _ := strings.Cut(n, ":")
-			if s.integrationMode(ctx, uid, kind, name) != "off" {
+			ok := s.connected(cctx, uid, kind, name)
+			mu.Lock()
+			needs[n] = ok
+			mu.Unlock()
+		}(n)
+	}
+	wg.Wait()
+	out := map[string]bool{}
+	for tool, list := range toolNeeds {
+		ok := len(list) == 0
+		for _, n := range list {
+			if needs[n] {
 				ok = true
 				break
 			}
 		}
-		mu.Lock()
 		out[tool] = ok
-		mu.Unlock()
 	}
 	writeJSON(w, http.StatusOK, out)
 }

@@ -1,14 +1,14 @@
 # Backup
 
-Everything is under `DATA_DIR` (`/data` in the image):
+Two things to keep:
 
-- `pocket-notes.db` (+ `-wal`, `-shm`) — the database. **Never copy it raw while the app runs**: use `pocket-notes backup` (`VACUUM INTO`, consistent), `GET /api/v1/backup` (admin) or a snapshot tool.
-- `media/<podcast id>/` — downloaded episodes and their thumbnails. Big, regenerable (podcast files can be downloaded again; YouTube ones too while the video exists).
-- `artwork/` — cached and custom show artwork. Small.
-- `ytdlp/` — an in-app yt-dlp update. Regenerable.
-- `backups/` — where the CLI backup writes.
-- `core.token`, `core.token.oidc.json` — Pocket Core credentials.
+1. **The notes** — wherever each person keeps them. Built-in notes are files under
+   `data/notes/<user id>/`; Nextcloud, WebDAV and server folders are backed up with those.
+   Settings → Import & export → *Download all notes* gives anyone their whole folder as a zip.
+2. **The database** — `data/pocket-notes.db`: the index plus what only it has: version history,
+   the trash, shared links, pins, settings and integrations. Take a consistent copy with
+   `pocket-notes backup [-o FILE]` (SQLite `VACUUM INTO`) while the app runs, or download it
+   (Settings → Import & export, admins only). Don't copy the live `.db` file with its WAL.
 
-A sensible nightly plan backs up the consistent DB copy, `artwork/` and the Core files, and skips `media/`. Restore: stop the app, put the `.db` back (remove stale `-wal`/`-shm`), start.
-
-Everyone can export their own subscriptions as OPML and their data as JSON (Settings → Backup & data).
+Restore: stop the app, put the database back, start it; it reads every notes folder again and
+fills in whatever changed meanwhile.

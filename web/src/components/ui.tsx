@@ -49,7 +49,7 @@ export function Empty({ title, children }: { title: string; children?: React.Rea
   return <div className="empty"><h3>{title}</h3>{children && <p className="muted">{children}</p>}</div>
 }
 
-export function Modal({ title, onClose, children, size = '' }: { title: React.ReactNode; onClose: () => void; children: React.ReactNode; size?: '' | 'lg' }) {
+export function Modal({ title, onClose, children, size = '' }: { title: React.ReactNode; onClose: () => void; children: React.ReactNode; size?: '' | 'lg' | 'xl' }) {
   useEffect(() => {
     const h = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose() }
     window.addEventListener('keydown', h)

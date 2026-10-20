@@ -1,5 +1,5 @@
-# Caddy: TLS + reverse proxy. Public feeds live under /feed/<key>/…, so the
-# whole site can stay private (VPN, auth proxy) while /feed/* is published.
-podcasts.example.com {
+# Caddy: TLS + reverse proxy. Shared notes live under /s/<token> and
+# /api/public/share/<token>; publish only those if the rest stays private.
+notes.example.com {
 	reverse_proxy 127.0.0.1:8080
 }

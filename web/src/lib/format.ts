@@ -1,51 +1,29 @@
-import type { Episode } from './types'
-
-export function ago(iso: string): string {
-  if (!iso) return ''
-  const t = new Date(iso).getTime()
-  const s = Math.max(0, (Date.now() - t) / 1000)
+/** Unix seconds or ISO → "just now", "5 min ago", "3 h ago", "Yesterday", "Mon", "14 Mar", "14 Mar 2025". */
+export function ago(t: string | number): string {
+  if (!t) return ''
+  const ms = typeof t === 'number' ? t * 1000 : new Date(t).getTime()
+  if (isNaN(ms)) return ''
+  const s = Math.max(0, (Date.now() - ms) / 1000)
   if (s < 60) return 'just now'
   if (s < 3600) return `${Math.floor(s / 60)} min ago`
-  if (s < 86400) return `${Math.floor(s / 3600)} h ago`
-  if (s < 86400 * 7) return `${Math.floor(s / 86400)} d ago`
-  return new Date(iso).toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: new Date(iso).getFullYear() === new Date().getFullYear() ? undefined : 'numeric' })
+  const d = new Date(ms), now = new Date()
+  const days = Math.round((new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime() - new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime()) / 86400000)
+  if (days === 0) return d.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' })
+  if (days === 1) return 'Yesterday'
+  if (days < 7) return d.toLocaleDateString(undefined, { weekday: 'long' })
+  return d.toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: d.getFullYear() === now.getFullYear() ? undefined : 'numeric' })
 }
 
-/** "2026-03-14T…" → "14 Mar" / "14 Mar 2025"; "" stays "". */
-export function fmtDate(iso: string): string {
-  if (!iso) return ''
-  const d = new Date(iso)
-  if (isNaN(d.getTime())) return ''
-  return d.toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: d.getFullYear() === new Date().getFullYear() ? undefined : 'numeric' })
-}
-
-/** 3723 → "1h 2m", 125 → "2 min", 0 → "". */
-export function fmtDur(sec: number): string {
-  if (!sec || sec <= 0) return ''
-  const h = Math.floor(sec / 3600), m = Math.round((sec % 3600) / 60)
-  if (h > 0) return m ? `${h}h ${m}m` : `${h}h`
-  if (m > 0) return `${m} min`
-  return `${Math.round(sec)} s`
-}
-
-/** 3723 → "1:02:03", 125 → "2:05". */
-export function clock(sec: number): string {
-  if (!isFinite(sec) || sec < 0) sec = 0
-  const s = Math.floor(sec)
-  const h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60), r = s % 60
-  const mm = h > 0 ? String(m).padStart(2, '0') : String(m)
-  return (h > 0 ? `${h}:` : '') + `${mm}:${String(r).padStart(2, '0')}`
-}
-
-/** Hours with one decimal from seconds: 5400 → "1.5 h". */
-export function hours(sec: number): string {
-  if (!sec) return '0 h'
-  const h = sec / 3600
-  return h >= 10 ? `${Math.round(h)} h` : `${h.toFixed(1)} h`
+/** Full date and time for a tooltip. */
+export function stamp(t: string | number): string {
+  if (!t) return ''
+  const d = typeof t === 'number' ? new Date(t * 1000) : new Date(t)
+  return d.toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' })
 }
 
 export function bytes(n: number): string {
   if (!n) return '0 B'
+  if (n < 1024) return `${n} B`
   if (n < 1024 * 1024) return `${Math.round(n / 1024)} KB`
   if (n < 1024 * 1024 * 1024) return `${(n / 1048576).toFixed(1)} MB`
   return `${(n / 1073741824).toFixed(2)} GB`
@@ -61,44 +39,55 @@ export function initials(name: string): string {
 const PALETTE = ['#2563eb', '#7c3aed', '#0891b2', '#059669', '#d97706', '#dc2626', '#db2777', '#4b5563', '#b45309', '#0d9488']
 export function colorFor(id: number): string { return PALETTE[Math.abs(id) % PALETTE.length] }
 
-/** Stable muted colour for an artwork placeholder, from the title. */
-const ARTS = ['#5b4b8a', '#2f5d62', '#8a4b4b', '#3e5a87', '#6b5b3e', '#4a6b45', '#7a4a6e', '#33475b', '#8a6a3e', '#4b4b6b']
-export function artColor(title: string): string {
+/** A stable colour for a tag or folder name. */
+export function tint(name: string): string {
   let h = 0
-  for (const c of title) h = (h * 31 + c.charCodeAt(0)) | 0
-  return ARTS[Math.abs(h) % ARTS.length]
+  for (const c of name) h = (h * 31 + c.charCodeAt(0)) | 0
+  return PALETTE[Math.abs(h) % PALETTE.length]
 }
 
-/** Time left in an episode, "12 min left" / "". */
-export function left(e: Pick<Episode, 'duration' | 'play_position' | 'completed'>): string {
-  if (!e.duration || e.completed) return ''
-  const r = e.duration - e.play_position
-  return r > 0 && e.play_position > 0 ? `${fmtDur(r)} left` : ''
+export function today(): string {
+  const d = new Date()
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
 }
 
-export function progressPct(e: Pick<Episode, 'duration' | 'play_position' | 'completed'>): number {
-  if (e.completed) return 100
-  if (!e.duration || !e.play_position) return 0
-  return Math.min(100, Math.round((e.play_position * 100) / e.duration))
+export function isoDay(d: Date): string {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
 }
 
-/** Strip HTML into plain text for one-line summaries. */
-export function plain(html: string, max = 200): string {
-  const d = document.createElement('div')
-  d.innerHTML = html
-  const t = (d.textContent || '').replace(/\s+/g, ' ').trim()
-  return t.length > max ? t.slice(0, max - 1) + '…' : t
+/** The last segment of a folder path. */
+export function leaf(path: string): string {
+  const i = path.lastIndexOf('/')
+  return i >= 0 ? path.slice(i + 1) : path
 }
 
-export const DL_LABEL: Record<string, string> = { none: '', queued: 'Queued', downloading: 'Downloading…', done: 'On server', failed: 'Download failed', culled: 'File removed' }
+/** Snippets mark the words found with [[[ ]]]; split them for highlighting. */
+export function snippetParts(s: string): { text: string; hit: boolean }[] {
+  const out: { text: string; hit: boolean }[] = []
+  const re = /\[\[\[(.*?)\]\]\]/g
+  let last = 0, m: RegExpExecArray | null
+  while ((m = re.exec(s))) {
+    if (m.index > last) out.push({ text: s.slice(last, m.index), hit: false })
+    out.push({ text: m[1], hit: true })
+    last = m.index + m[0].length
+  }
+  if (last < s.length) out.push({ text: s.slice(last), hit: false })
+  return out
+}
 
-export const SB_CATEGORIES: { id: string; label: string; hint: string }[] = [
-  { id: 'sponsor', label: 'Sponsor', hint: 'Paid promotions and ads' },
-  { id: 'selfpromo', label: 'Self-promotion', hint: 'Merch, Patreon, own channels' },
-  { id: 'interaction', label: 'Interaction reminder', hint: '“Like and subscribe”' },
-  { id: 'intro', label: 'Intro', hint: 'Intermission / intro animation' },
-  { id: 'outro', label: 'Outro', hint: 'End cards and credits' },
-  { id: 'preview', label: 'Preview / recap', hint: 'What is coming up' },
-  { id: 'music_offtopic', label: 'Non-music', hint: 'In music videos only' },
-  { id: 'filler', label: 'Filler', hint: 'Tangents and jokes (aggressive)' },
-]
+/** The headings of a note, for the outline. */
+export function headings(md: string): { level: number; text: string; line: number }[] {
+  const out: { level: number; text: string; line: number }[] = []
+  let fence = false
+  md.split('\n').forEach((l, i) => {
+    if (/^\s*(```|~~~)/.test(l)) { fence = !fence; return }
+    if (fence) return
+    const m = /^(#{1,6})\s+(.+?)\s*#*\s*$/.exec(l)
+    if (m) out.push({ level: m[1].length, text: m[2].replace(/[*_`]/g, ''), line: i })
+  })
+  return out
+}
+
+export function wordCount(md: string): number {
+  return (md.replace(/```[\s\S]*?```/g, ' ').match(/[\p{L}\p{N}][\p{L}\p{N}'’-]*/gu) || []).length
+}

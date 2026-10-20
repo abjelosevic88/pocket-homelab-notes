@@ -10,14 +10,15 @@ export class ApiError extends Error {
 }
 
 async function request<T>(method: string, url: string, body?: unknown, raw = false): Promise<T> {
-  const init: RequestInit = { method, headers: {}, credentials: 'same-origin' }
+  const headers: Record<string, string> = { 'X-Pocket-Source': 'web' }
+  const init: RequestInit = { method, headers, credentials: 'same-origin' }
   if (body !== undefined) {
-    ;(init.headers as Record<string, string>)['Content-Type'] = 'application/json'
+    headers['Content-Type'] = 'application/json'
     init.body = JSON.stringify(body)
   }
   const res = await fetch(url, init)
   if (res.status === 401 && !url.includes('/auth/')) {
-    window.dispatchEvent(new CustomEvent('pp:unauthorized'))
+    window.dispatchEvent(new CustomEvent('pn:unauthorized'))
   }
   if (!res.ok) {
     let msg = res.statusText
@@ -43,12 +44,20 @@ export const api = {
 
 export const V1 = '/api/v1'
 
-/** POST a file as multipart/form-data. */
-export async function upload<T>(url: string, field: string, file: File): Promise<T> {
+/** POST files as multipart/form-data. */
+export async function upload<T>(url: string, field: string, files: File | File[], extra: Record<string, string> = {}): Promise<T> {
   const fd = new FormData()
-  fd.append(field, file)
-  const res = await fetch(url, { method: 'POST', body: fd, credentials: 'same-origin' })
+  for (const f of Array.isArray(files) ? files : [files]) fd.append(field, f, f.name)
+  for (const [k, v] of Object.entries(extra)) fd.append(k, v)
+  const res = await fetch(url, { method: 'POST', body: fd, credentials: 'same-origin', headers: { 'X-Pocket-Source': 'web' } })
   const j = await res.json().catch(() => ({}))
   if (!res.ok) throw new ApiError(res.status, j.error || res.statusText, j)
   return j as T
+}
+
+export const qs = (o: Record<string, string | number | boolean | undefined | null>) => {
+  const p = new URLSearchParams()
+  for (const [k, v] of Object.entries(o)) if (v !== undefined && v !== null && v !== '' && v !== false) p.set(k, String(v))
+  const s = p.toString()
+  return s ? '?' + s : ''
 }

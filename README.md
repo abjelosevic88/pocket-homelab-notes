@@ -1,75 +1,99 @@
 <p align="center"><img src="web/public/favicon.svg" width="72" alt=""></p>
 <h1 align="center">Pocket Notes</h1>
-<p align="center">A self-hosted podcast server that also turns YouTube channels into podcasts.<br>One Go binary, one SQLite file, one volume.</p>
+<p align="center">Self-hosted Markdown notes kept as plain files where you choose — on the server, in your Nextcloud, on any WebDAV server or in a folder.<br>One Go binary, one SQLite file, one volume.</p>
 
-Pocket Notes keeps your subscriptions, plays them in the browser (and remembers where you stopped on every device), downloads episodes to your box, follows YouTube channels and playlists as audio podcasts with SponsorBlock, and publishes every subscription as a normal RSS feed so Apple Podcasts, Overcast or AntennaPod can play it too.
+Pocket Notes is a notes server that does what Nextcloud Notes does and a good deal more: full-text
+search, tags, links between notes with backlinks, every checkbox gathered into one task list, daily
+notes with quick capture, a version history of every change from any device, a trash, public
+read-only links, and a rich editor whose `/` menu reaches into the rest of the homelab (photos from
+Immich, documents from Paperless, issues from Forgejo, the server's state, the week's viewing,
+spending, the car's log…).
 
-It replaces PinePods for people who want the same ideas with less machinery: no Postgres, no Valkey, no separate YouTube downloader, and a YouTube path that actually works.
+The notes stay ordinary `.md` files in folders. Point it at the folder Nextcloud Notes uses and both
+see the same notes — and because Pocket Notes also speaks Nextcloud Notes' own API, the Nextcloud
+Notes apps and the Pocket Homelab app work against it too.
 
-<p align="center"><img src="docs/screenshots/home.png" width="900" alt="Home: continue listening, up next, podcasts, new episodes"></p>
+<p align="center"><img src="docs/screenshots/home.png" width="900" alt="A note with tasks and a diagram, the list and the folder tree"></p>
 
 ## Screenshots
 
 <table>
   <tr>
-    <td width="50%"><img src="docs/screenshots/podcast.png" alt="A YouTube channel as a podcast: episodes with download state, SponsorBlock badges, per-show settings"></td>
-    <td width="50%"><img src="docs/screenshots/player.png" alt="The player: artwork, SponsorBlock on, speed, sleep timer, chapters"></td>
+    <td width="50%"><img src="docs/screenshots/slash.png" alt="The / menu: blocks, diagrams, templates, homelab tools"></td>
+    <td width="50%"><img src="docs/screenshots/markdown.png" alt="The same note as Markdown source"></td>
   </tr>
   <tr>
-    <td width="50%"><img src="docs/screenshots/add.png" alt="Adding: directory search with Follow or Episodes per result"></td>
-    <td width="50%"><img src="docs/screenshots/add-pick.png" alt="Picking a single episode of a show without following it"></td>
+    <td width="50%"><img src="docs/screenshots/history.png" alt="History: every change, with a diff and restore"></td>
+    <td width="50%"><img src="docs/screenshots/switcher.png" alt="⌘K: find by title or by what a note says"></td>
   </tr>
   <tr>
-    <td width="50%"><img src="docs/screenshots/episode.png" alt="An episode: chapters, SponsorBlock segments, notes, actions"></td>
-    <td width="50%"><img src="docs/screenshots/playlists.png" alt="Smart playlists"></td>
+    <td width="50%"><img src="docs/screenshots/tasks.png" alt="Tasks: every checkbox in every note, by due date"></td>
+    <td width="50%"><img src="docs/screenshots/calendar.png" alt="Daily notes on a calendar"></td>
   </tr>
   <tr>
-    <td width="50%"><img src="docs/screenshots/downloads.png" alt="Downloads: running, failed and on disk"></td>
-    <td width="50%"><img src="docs/screenshots/settings-feeds.png" alt="Public feeds for Apple Podcasts, Overcast, AntennaPod"></td>
+    <td width="50%"><img src="docs/screenshots/storage.png" alt="Storage: on the server, Nextcloud, WebDAV or a folder"></td>
+    <td width="50%"><img src="docs/screenshots/integrations.png" alt="Integrations through Pocket Core or typed in"></td>
   </tr>
 </table>
 <p align="center">
-  <img src="docs/screenshots/mobile-home.png" width="260" alt="Home on a phone">&nbsp;&nbsp;
-  <img src="docs/screenshots/mobile-player.png" width="260" alt="The player on a phone">&nbsp;&nbsp;
-  <img src="docs/screenshots/episodes-dark.png" width="360" alt="Episodes in dark mode">
+  <img src="docs/screenshots/mobile-list.png" width="260" alt="The list on a phone">&nbsp;&nbsp;
+  <img src="docs/screenshots/mobile-note.png" width="260" alt="A note on a phone">&nbsp;&nbsp;
+  <img src="docs/screenshots/dark.png" width="420" alt="Dark mode">
 </p>
 
 ## What it does
 
-**Subscriptions**
-- Search Apple's directory (no key) and [Podcast Index](https://podcastindex.org) (free key), or paste a feed URL. OPML import and export.
-- **Picks**: take a single episode of a show you do not want to follow (one guest, one talk) — it lands in your "Picks" show, downloaded, next to single YouTube videos.
-- Feeds are checked on a schedule with `ETag` / `Last-Modified`, per-feed intervals and back-off when a feed breaks. Episode artwork, chapters (podcast 2.0), transcripts, seasons and episode numbers are kept.
-- Per-podcast settings: playback speed, skip intro/outro seconds, auto-play next, notifications, auto-download, retention, feed cut-off, custom artwork.
+**Your notes, your files**
+- Each person chooses where their notes live: a folder on this server, a folder in **Nextcloud**
+  (through Pocket Core, nothing to type), any **WebDAV** server, or a folder on the server
+  (`STORAGE_ROOTS`). Moving copies everything over, or starts from what is already there.
+- Changes made elsewhere — Nextcloud Notes, a phone, Obsidian, a text editor — come in on their own;
+  renamed files keep their history; deleted ones land in the trash with their text.
+- A save never overwrites somebody else's edit: you see *Changed somewhere else* and choose.
+- Note ids are Nextcloud's file ids when the notes live there, so links and apps keep working.
 
-**YouTube as podcasts**
-- Subscribe to a channel (`@handle`, `/channel/UC…`), a playlist (also unlisted — a "Watch later" playlist you control) or a single video. The channel is indexed in about a second with `yt-dlp --flat-playlist`; the newest N videos are downloaded as `m4a` with ffmpeg, then every new upload after that.
-- Filters: minimum length (keeps Shorts out), title regex, per-source retention.
-- [SponsorBlock](https://sponsor.ajay.app) segments are fetched with every video and the player skips the categories you choose (sponsor, self-promotion, reminders, intro, outro…). Nothing is cut from the file.
-- Episode date can be the upload date or the download date (the latter keeps old videos you add later at the top of podcast apps).
-- `yt-dlp` updates itself from Settings, without a rebuild.
+**Writing**
+- The rich editor of the Pocket Homelab app (Milkdown): edit as it reads; `/` for headings, lists,
+  tasks, tables, code in 20 languages, callouts, collapsible sections, Mermaid diagrams, formulas,
+  footnotes, a table of contents, emoji, dates (`@today`), templates.
+- Or the plain **Markdown** source (CodeMirror), one click away, for every note.
+- `[[` links a note; `[[Title]]` written by hand works too. Backlinks and unlinked mentions per note.
+- `#tags` anywhere (and in front matter); folders as deep as you like.
+- Pictures and files pasted, dropped or uploaded are stored with the note.
+- Title follows the first line, as in Nextcloud Notes (or not — your choice).
 
-**Listening**
-- Web player with resume, speed (0.8–2.5×), skip back/forward, chapters, sleep timer, keyboard shortcuts and lock-screen controls (Media Session API). Progress is saved every few seconds, so a phone and a laptop pick up where the other left off.
-- Up-next queue (reorderable), saved episodes, history, "mark as played", auto-play the next queued episode.
-- Smart playlists: filters over your episodes (unplayed / in progress / played, podcasts, length, age, on disk only, order, limit) that stay current. Five sensible ones are created for every person.
-- Home page: continue listening, up next, new episodes, recently played.
-- Stats: hours listened (total, year, month, week), streaks, time of day, day of week, top podcasts and episodes, last 90 days and 12 months.
+**Homelab tools** in the `/` menu (each shown when its service is connected)
+- *Link to something*: Nextcloud files (full-text), Paperless documents, Forgejo issues and pull
+  requests, Jellyfin titles, Immich photos — the note gets a link, not a copy.
+- *From Photos* (Immich, smart search) and *From Nextcloud*: put pictures and files into a note.
+- *Make this line a task* (Nextcloud Tasks or Deck) and *Make this line a transaction* (Pocket
+  Money): the line stays, with a link to where it went.
+- Blocks written from what the services know: homelab snapshot, what needs attention (Kuma,
+  Scrutiny, Backrest), watched and listened this week (Jellystat, Pocket Podcasts, Audiobookshelf),
+  spending this month (Pocket Money), the vehicle log (Pocket Garage), hosts on the network
+  (AdGuard), server processes (Glances), days of habits (Pocket Habits).
+- Web bookmark with the page's title, a voice memo (with its words, where the browser can), a photo.
 
-**Downloads**
-- Episodes stream from the publisher until you download them; downloaded files are served from the box with range requests (seeking).
-- Auto-download per podcast, retention in days (saved and queued episodes are never culled), a played podcast download is dropped unless you keep files, failed downloads are retried three times.
-- Downloads page shows what is running, failed and on disk.
+**Finding and keeping**
+- Full-text search (SQLite FTS5, accents folded) with `tag:`, `in:`, `is:fav`, `has:tasks`, `"phrases"`.
+  ⌘K finds by title as you type.
+- **Tasks**: every checkbox in every note, overdue / today / upcoming (`📅 2026-10-21` or `due:`), tick
+  them from the list.
+- **Daily notes** in your own folder, title format and template; a calendar of them; **capture**
+  to today's note from the sidebar, a Shortcut, Raycast or `curl`.
+- **History**: every saved state, from any device, with a diff and restore. **Trash** for 30 days.
+- Favourites (Nextcloud's star, both ways), pins, recent, sort by edited / created / title.
+- **Share** a note as a read-only public link, with an end date if you like. Print / PDF, standalone
+  HTML, `.md`, or the whole folder as a zip. Import Markdown files or a zip (Obsidian, Bear, Joplin).
 
-**Public feeds**
-- `https://your-box/feed/<your-key>/<podcast>.xml` for every subscription — with the files, artwork and chapters served by this box. One secret key per person, rotatable. YouTube feeds list what is on disk; podcast feeds list everything.
-
-**A household, strictly per person**
-- Every account has its own subscriptions, episodes, files, queue, history, playlists and settings. Admins manage accounts and the app title and see nothing else.
-- Built-in login, or `AUTH_MODE=proxy` behind Authelia / Authentik / Tinyauth, or "Sign in with Pocket Core" / any OpenID Connect provider.
-- API tokens for scripts and widgets (`GET /api/v1/dashboard` for Homepage), new-episode notifications through Apprise, ntfy or a webhook.
-
-**Pocket Core** (optional): registers on start, publishes `podcasts.subscribed / unsubscribed / episode_added / played / finished / downloaded`, accepts paired-phone tokens, offers `podcasts:read`, `history:read` and `queue:write` to other Pocket apps. Without `CORE_URL` nothing changes.
+**The rest**
+- **Nextcloud Notes API** (v0.2 and v1, attachments, unified search, the WebDAV the apps use): the
+  Nextcloud Notes apps and the Pocket Homelab app work against Pocket Notes as they are.
+- Every person has their own notes, storage and settings; admins see no one else's.
+- Pocket Core: "Sign in with Pocket Core", each person's own service accounts for the integrations,
+  app links for Pocket Habits / Money / Garage / Podcasts, `notes.created/updated/deleted` events,
+  and `notes:read` / `notes:write` for other Pocket apps.
+- `GET /api/v1/dashboard` for Homepage, Prometheus `/metrics`, API tokens, dark mode, a PWA.
 
 ## Run it
 
@@ -77,39 +101,41 @@ It replaces PinePods for people who want the same ideas with less machinery: no 
 services:
   pocket-notes:
     image: ghcr.io/abjelosevic88/pocket-homelab-notes:latest
-    container_name: pocket-notes
     restart: unless-stopped
     ports: ["8080:8080"]
     environment:
       TZ: Europe/Berlin
-      BASE_URL: https://podcasts.example.com
+      BASE_URL: https://notes.example.com
+      SECURE_COOKIES: "true"
     volumes:
       - ./data:/data
 ```
 
-Open it, create the first account (the admin), add a podcast or a YouTube channel. The image ships `yt-dlp`, `deno` and `ffmpeg`; the plain binary needs them on `PATH` for YouTube (see [docs/configuration.md](docs/configuration.md)).
+Open it, create the first account, then **Settings → Storage** to choose where your notes live.
+To keep using Nextcloud Notes alongside, choose Nextcloud and the folder Nextcloud Notes uses
+(Nextcloud Notes → Settings shows it, `Notes` unless you changed it).
 
-Downloads land in `data/media/<podcast id>/`, artwork in `data/artwork/`, the database is `data/pocket-notes.db`.
-
-## Coming from PinePods
-
-`scripts/import-pinepods.py` reads your PinePods database and produces the JSON that **Settings → Backup & data → Import JSON** accepts: subscriptions with their settings, and for every episode you touched the position, played state, saved and queued flags. With `--youtube-native` the YouTube-backed feeds become real YouTube subscriptions downloaded by Pocket Notes itself. See [docs/migrating-from-pinepods.md](docs/migrating-from-pinepods.md).
+To use a Nextcloud Notes app with it: server = this address, username = your email, password = an
+API token from Settings → Apps & API.
 
 ## Docs
 
 - [Configuration](docs/configuration.md) — every environment variable
-- [API](docs/api.md) — the JSON API and the public feeds
-- [YouTube](docs/youtube.md) — how indexing, downloads, SponsorBlock and retention work
+- [Where notes live](docs/storage.md) — storage kinds, sync, conflicts, moving, ids
+- [Nextcloud Notes compatibility](docs/nextcloud-notes-api.md)
+- [HTTP API](docs/api.md) — notes, search, tasks, capture, Shortcuts
 - [Backup](docs/backup.md)
-- [Migrating from PinePods](docs/migrating-from-pinepods.md)
 - [Roadmap](docs/roadmap.md)
 
 ## Develop
 
-```
-make dev      # API on :8080 with demo data, Vite on :5173
-make test     # go vet + go test, tsc
-make          # web UI + binary with the UI embedded
+```sh
+make web          # build the UI (web/ → web/dist, embedded in the binary)
+make run          # demo data, no login, http://localhost:8080
+make test         # go vet + go test + tsc
 ```
 
-MIT — Aleksandar Bjelosevic.
+The rich editor lives in `web/src/editor` (it is the Pocket Homelab app's editor, running in a frame
+of the page as it runs in a web view there); the page talks to it in `web/src/components/RichEditor.tsx`.
+
+MIT licensed.
