@@ -42,7 +42,8 @@ const NoteView = forwardRef<NoteViewHandle, { id: number; onBack?: () => void; e
   const [status, setStatus] = useState<Status>('saved')
   const [conflict, setConflict] = useState<Note | null>(null)
   const [mode, setMode] = useState<'rich' | 'markdown'>(() => (localStorage.getItem('pn-mode') as 'rich' | 'markdown') || settings?.editor || 'rich')
-  const [panel, setPanel] = useState<'' | 'outline' | 'links' | 'info'>(() => (localStorage.getItem('pn-panel') as '' | 'outline' | 'links' | 'info') || '')
+  // On a phone the panel covers the note, so it is never open on arrival there.
+  const [panel, setPanel] = useState<'' | 'outline' | 'links' | 'info'>(() => isPhone() ? '' : (localStorage.getItem('pn-panel') as '' | 'outline' | 'links' | 'info') || '')
   const [sheet, setSheet] = useState<Sheet | null>(null)
   const [title, setTitle] = useState('')
   const [menu, setMenu] = useState(false)
@@ -55,7 +56,7 @@ const NoteView = forwardRef<NoteViewHandle, { id: number; onBack?: () => void; e
   const cur = useRef<{ id: number; etag: string; saved: string; draft: string; saving: boolean; again: boolean; timer: number }>({ id: 0, etag: '', saved: '', draft: '', saving: false, again: false, timer: 0 })
 
   useEffect(() => { localStorage.setItem('pn-mode', mode) }, [mode])
-  useEffect(() => { localStorage.setItem('pn-panel', panel) }, [panel])
+  useEffect(() => { if (!isPhone()) localStorage.setItem('pn-panel', panel) }, [panel])
 
   const save = useCallback(async (): Promise<void> => {
     const c = cur.current
@@ -375,16 +376,20 @@ const NoteView = forwardRef<NoteViewHandle, { id: number; onBack?: () => void; e
         </div>
         <div className="note-actions">
           <span className={`save-state ${status}`} title={stamp(note.modified)}>{statusText[status]}</span>
-          <button className={`btn ghost icon ${note.favorite ? 'on star' : ''}`} title={note.favorite ? 'Remove from favourites' : 'Favourite'} onClick={() => patch({ favorite: !note.favorite })}>{note.favorite ? '★' : '☆'}</button>
-          <button className={`btn ghost icon ${note.pinned ? 'on' : ''}`} title={note.pinned ? 'Unpin' : 'Pin to the top'} onClick={() => patch({ pinned: !note.pinned })}>📌</button>
+          <button className={`btn ghost icon wide-only ${note.favorite ? 'on star' : ''}`} title={note.favorite ? 'Remove from favourites' : 'Favourite'} onClick={() => patch({ favorite: !note.favorite })}>{note.favorite ? '★' : '☆'}</button>
+          <button className={`btn ghost icon wide-only ${note.pinned ? 'on' : ''}`} title={note.pinned ? 'Unpin' : 'Pin to the top'} onClick={() => patch({ pinned: !note.pinned })}>📌</button>
           <div className="segmented sm mode-toggle">
             <button className={mode === 'rich' ? 'active' : ''} onClick={() => { const p = rich.current?.flush(); if (p != null) changed(p); setMode('rich'); setRevision(r => r + 1) }} title="Rich text">Aa</button>
             <button className={mode === 'markdown' ? 'active' : ''} onClick={() => { const p = rich.current?.flush(); if (p != null) changed(p); setMode('markdown'); setRevision(r => r + 1) }} title="Markdown source">M↓</button>
           </div>
-          <button className={`btn ghost icon ${panel ? 'on' : ''}`} title="Outline, links and info" onClick={() => setPanel(p => p ? '' : 'outline')}>☰</button>
+          <button className={`btn ghost icon wide-only ${panel ? 'on' : ''}`} title="Outline, links and info" onClick={() => setPanel(p => p ? '' : 'outline')}>☰</button>
           <div className="menu-wrap">
             <button className="btn ghost icon" onClick={() => setMenu(o => !o)} aria-label="More">⋯</button>
             {menu && <div className="menu" onMouseLeave={() => setMenu(false)} onClick={() => setMenu(false)}>
+              <button className="phone-only" onClick={() => patch({ favorite: !note.favorite })}>{note.favorite ? '★ Remove from favourites' : '☆ Favourite'}</button>
+              <button className="phone-only" onClick={() => patch({ pinned: !note.pinned })}>{note.pinned ? '📌 Unpin' : '📌 Pin to the top'}</button>
+              <button className="phone-only" onClick={() => setPanel('outline')}>☰ Outline, links and info</button>
+              <hr className="phone-only" />
               <button onClick={() => setSheet({ kind: 'history' })}>History…</button>
               <button onClick={() => setSheet({ kind: 'share' })}>Share a link…</button>
               <button onClick={() => setSheet({ kind: 'move' })}>Move to…</button>
@@ -422,13 +427,17 @@ const NoteView = forwardRef<NoteViewHandle, { id: number; onBack?: () => void; e
                 onFailed={msg => { toast(`The rich editor could not open this note (${msg}); showing Markdown.`, 'err'); setMode('markdown') }} />
             : <MarkdownEditor ref={md} docKey={String(note.id)} revision={revision} content={draft} readonly={note.readonly} spellcheck={settings?.spellcheck} onChange={changed} onPasteFiles={uploadFiles} onOpenLink={u => openLink(u)} />}
         </div>
+        {panel && <div className="panel-scrim" onClick={() => setPanel('')} />}
         {panel && <aside className="note-panel">
-          <div className="segmented sm mb">
+          <div className="panel-head">
+          <div className="segmented sm">
             <button className={panel === 'outline' ? 'active' : ''} onClick={() => setPanel('outline')}>Outline</button>
             <button className={panel === 'links' ? 'active' : ''} onClick={() => setPanel('links')}>Links</button>
             <button className={panel === 'info' ? 'active' : ''} onClick={() => setPanel('info')}>Info</button>
           </div>
-          {panel === 'outline' && (outline.length ? <ul className="outline">{outline.map((h, i) => <li key={i} style={{ paddingLeft: (h.level - 1) * 12 }}><button onClick={() => mode === 'rich' ? rich.current?.scrollToHeading(h.text, outline.slice(0, i).filter(x => x.text === h.text).length) : md.current?.scrollToLine(h.line)}>{h.text}</button></li>)}</ul> : <p className="muted small">No headings in this note.</p>)}
+          <button className="btn ghost icon sm panel-close" onClick={() => setPanel('')} aria-label="Close">✕</button>
+          </div>
+          {panel === 'outline' && (outline.length ? <ul className="outline">{outline.map((h, i) => <li key={i} style={{ paddingLeft: (h.level - 1) * 12 }}><button onClick={() => { if (isPhone()) setPanel(''); if (mode === 'rich') rich.current?.scrollToHeading(h.text, outline.slice(0, i).filter(x => x.text === h.text).length); else md.current?.scrollToLine(h.line) }}>{h.text}</button></li>)}</ul> : <p className="muted small">No headings in this note.</p>)}
           {panel === 'links' && <Backlinks id={note.id} etag={note.etag} />}
           {panel === 'info' && <Info note={note} words={words} chars={draft.length} />}
         </aside>}
@@ -464,12 +473,16 @@ const NoteView = forwardRef<NoteViewHandle, { id: number; onBack?: () => void; e
 
 export default NoteView
 
+/** The one-pane layout (styles.css: max-width 760px). */
+function isPhone() { return window.matchMedia('(max-width: 760px)').matches }
+
 function MdToolbar({ ed, onTool, onAttach, onTemplates, tools }: { ed: React.RefObject<MarkdownEditorHandle | null>; onTool: (t: string) => void; onAttach: (s: string) => void; onTemplates: () => void; tools: string[] }) {
   const [open, setOpen] = useState(false)
   const b = (label: string, title: string, fn: () => void) => <button className="btn ghost sm" title={title} onMouseDown={e => e.preventDefault()} onClick={fn}>{label}</button>
   const items: [string, string][] = [['link', 'Link to something…'], ['bookmark', 'Web bookmark…'], ['task', 'Make this line a task…'], ['expense', 'Make this line a transaction…'], ['snapshot', 'Homelab snapshot'], ['attention', 'What needs attention'], ['media', 'Watched and listened this week'], ['spent', 'Spending this month'], ['fuel', 'Vehicle log'], ['hosts', 'Hosts on the network'], ['processes', 'Server processes'], ['habits', 'Days of habits…'], ['voice', 'Voice memo…'], ['camera', 'Take a photo…']]
   return (
     <div className="md-toolbar">
+      <div className="md-tools">
       {b('B', 'Bold (⌘B)', () => ed.current?.wrap('**'))}
       {b('I', 'Italic (⌘I)', () => ed.current?.wrap('*'))}
       {b('S̶', 'Strikethrough', () => ed.current?.wrap('~~'))}
@@ -491,6 +504,7 @@ function MdToolbar({ ed, onTool, onAttach, onTemplates, tools }: { ed: React.Ref
       {b('🖼', 'From Photos (Immich)', () => onAttach('immich'))}
       {b('☁', 'From Nextcloud', () => onAttach('nextcloud'))}
       {b('📋', 'My templates', onTemplates)}
+      </div>
       <div className="menu-wrap">
         <button className="btn ghost sm" onClick={() => setOpen(o => !o)}>Homelab ▾</button>
         {open && <div className="menu" onMouseLeave={() => setOpen(false)} onClick={() => setOpen(false)}>

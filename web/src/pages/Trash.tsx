@@ -23,7 +23,7 @@ export default function Trash() {
       <PageHeader title="Trash" sub={`Deleted notes stay ${settings?.trash_days ?? 30} days, then they are gone. Notes that disappeared from the folder (deleted in another app) land here too.`}
         actions={data && data.length > 0 && <button className="btn ghost danger-text" onClick={() => setEmpty(true)}>Empty the trash</button>} />
       {!data ? <Loading /> : data.length === 0 ? <Empty title="The trash is empty" /> : (
-        <table className="table">
+        <table className="table trash-table">
           <thead><tr><th>Note</th><th>Was in</th><th>Deleted</th><th /></tr></thead>
           <tbody>{data.map(t => (
             <tr key={t.id}>

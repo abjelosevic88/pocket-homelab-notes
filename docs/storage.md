@@ -9,10 +9,10 @@ Each person chooses their own place in **Settings → Storage**:
 
 | Kind | What it is |
 | --- | --- |
-| **On this server** | `data/notes/<user id>/`, backed up with the app's data. The default. |
+| **In Pocket Notes** | `data/notes/<user id>/`, backed up with the app's data. The default. |
 | **Nextcloud** | A folder in your Nextcloud, through WebDAV — the one Nextcloud Notes uses, if you like (`Notes`, or what its settings say). With Pocket Core, nothing to type: Core holds your Nextcloud account. Otherwise your username and an app password. |
 | **WebDAV** | Any WebDAV folder: ownCloud, Synology, a NAS, Seafile, Apache/nginx DAV. |
-| **A folder on this server** | A folder inside one of `STORAGE_ROOTS` (mounted into the container). |
+| **Your own folder** | A folder inside one of `STORAGE_ROOTS` (mounted into the container). |
 
 ## Keeping in step
 

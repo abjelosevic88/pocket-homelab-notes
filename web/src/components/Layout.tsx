@@ -95,7 +95,7 @@ export default function Layout() {
   const syncDot = sync?.error ? 'bad' : sync?.syncing || syncing ? 'busy' : 'ok'
 
   return (
-    <div className="app">
+    <div className={`app ${loc.pathname.startsWith('/note/') ? 'on-note' : ''}`}>
       <aside className={`sidebar ${open ? 'open' : ''}`}>
         <div className="brand"><span className="logo"><img src="/favicon.svg" alt="" /></span><span className="brand-name">{title}</span></div>
         <div className="side-actions">

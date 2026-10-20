@@ -200,7 +200,7 @@ func (s *Server) backendFor(ctx context.Context, uid int64, st store.Settings) (
 		b.UserAgent = ua
 		return b, nil
 	default:
-		return storage.NewLocal(s.builtinDir(uid), "builtin", "On this server"), nil
+		return storage.NewLocal(s.builtinDir(uid), "builtin", "In Pocket Notes"), nil
 	}
 }
 

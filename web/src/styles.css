@@ -505,3 +505,69 @@ select.xs { width: auto; padding: 2px 6px; font-size: 12px; border-radius: 6px; 
   .integration-actions { flex: 1 1 100%; justify-content: flex-end; }
   .integration-result, .integration > .integration-form { margin-left: 0; }
 }
+
+/* ---- phone polish ---- */
+.md-toolbar { flex-wrap: nowrap; }
+.md-tools { display: flex; flex-wrap: wrap; gap: 2px; align-items: center; flex: 1; min-width: 0; }
+.panel-head { display: flex; align-items: center; gap: 8px; margin-bottom: 12px; }
+.panel-close, .phone-only, .panel-scrim { display: none; }
+.due { white-space: nowrap; display: inline-block; }
+@media (max-width: 760px) {
+  /* iOS Safari zooms into any field under 16px when it gets the focus. */
+  input, select, textarea, .capture input, .capture-big input, .tool-search.sm input { font-size: 16px; }
+  .md-editor .cm-content { font-size: 16px; }
+
+  /* A note on a phone: its own header (back, title, editor switch, ⋯) replaces the app bar. */
+  .app.on-note .topbar { display: none; }
+  .app.on-note .note-view:not(.embedded) .note-head { padding-top: max(8px, env(safe-area-inset-top)); }
+  .note-head { flex-wrap: nowrap; align-items: center; gap: 2px; padding: 6px 6px 6px 4px; }
+  .note-head .back-btn { margin-top: 0; flex-shrink: 0; }
+  .note-title-wrap { flex: 1 1 auto; min-width: 0; }
+  .note-crumbs { line-height: 1.2; }
+  .note-title { font-size: 17px; font-weight: 600; padding: 2px 0; text-overflow: ellipsis; }
+  .note-actions { flex: 0 0 auto; padding-top: 0; flex-wrap: nowrap; gap: 0; }
+  .note-actions .wide-only { display: none; }
+  .note-actions .segmented.sm button { padding: 4px 8px; }
+  .menu .phone-only { display: block; }
+  .menu hr.phone-only { display: block; }
+  .note-tags { padding-top: 6px; }
+
+  /* Outline, links and info: a sheet over the note, with a way out. */
+  .panel-scrim { display: block; position: fixed; inset: 0; background: rgba(0,0,0,.3); z-index: 44; }
+  .note-panel { position: fixed; left: 0; right: 0; bottom: 0; top: auto; width: auto; max-height: 70vh; z-index: 45; border-left: 0; border-radius: 16px 16px 0 0; box-shadow: 0 -10px 30px rgba(0,0,0,.2); padding: 12px 14px calc(14px + env(safe-area-inset-bottom)); }
+  .panel-close { display: inline-flex; margin-left: auto; }
+
+  /* Markdown toolbar: one row that scrolls, the Homelab menu stays at the end. */
+  .md-toolbar { padding: 4px 6px; gap: 4px; }
+  .md-tools { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; -webkit-overflow-scrolling: touch; }
+  .md-tools::-webkit-scrollbar { display: none; }
+  .md-tools .btn.sm { flex-shrink: 0; min-width: 34px; height: 34px; }
+  .md-toolbar > .menu-wrap { flex-shrink: 0; border-left: 1px solid var(--border); padding-left: 4px; }
+
+  /* Settings: the tabs wrap into chips instead of running off the screen. */
+  .tabs { flex-wrap: wrap; gap: 6px; border-bottom: 0; overflow: visible; padding-bottom: 4px; }
+  .tabs button { border: 1px solid var(--border); border-radius: 999px; padding: 5px 12px; background: var(--surface); font-size: 13px; }
+  .tabs button.active { background: var(--accent-soft); border-color: var(--accent); color: var(--accent-hover); }
+
+  /* Today: seven days and the calendar button fit across. */
+  .week-strip { gap: 4px; overflow: visible; }
+  .wday { min-width: 0; padding: 6px 0 5px; border-radius: 10px; }
+  .wday b { font-size: 16px; }
+  .wday small { font-size: 10px; letter-spacing: 0; }
+  .wday.cal-link { flex: 0 0 30px; min-width: 30px; font-size: 15px; }
+  .today-note .note-view.embedded .note-head { padding: 6px 8px; }
+  .today-note { height: 75vh; }
+
+  /* Tasks: the note a task comes from goes under it. */
+  .task-list li { display: grid; grid-template-columns: 18px minmax(0, 1fr); column-gap: 10px; row-gap: 0; }
+  .task-list li > a { grid-column: 2; font-size: 12px; }
+
+  /* Trash: the folder column gives way to the note. */
+  .trash-table { table-layout: fixed; width: 100%; }
+  .trash-table th:nth-child(2), .trash-table td:nth-child(2) { display: none; }
+  .trash-table th:nth-child(3), .trash-table td:nth-child(3) { width: 74px; font-size: 12px; }
+  .trash-table th:nth-child(4), .trash-table td:nth-child(4) { width: 84px; }
+  .trash-table td .ellipsis { max-width: none !important; }
+  .trash-table td { padding-left: 8px; padding-right: 8px; }
+  .trash-table td .row { flex-direction: column; align-items: stretch; gap: 4px; }
+}
