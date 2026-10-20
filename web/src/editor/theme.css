@@ -352,3 +352,8 @@ body.phone .turn-into-menu button { padding: 9px 10px; }
 
 /* [[Wiki links]]: shown as links, opened with ⌘-click (a tap on a touch screen). */
 .milkdown .ProseMirror .wikilink { color: var(--accent); text-decoration: underline dotted; text-underline-offset: 3px; }
+
+/* The last note, as a picture, over the next one while it is drawn (main.js load). */
+#editor { position: relative; }
+.editor-curtain { position: absolute; inset: 0; z-index: 5; pointer-events: none; overflow: hidden; background: #fff; }
+:root[data-theme="dark"] .editor-curtain { background: #1c1b17; }

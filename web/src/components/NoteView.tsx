@@ -107,9 +107,12 @@ export default function NoteView({ id, onBack }: { id: number; onBack?: () => vo
       api.put(`${V1}/notes/${prev.id}`, { content: prev.draft, etag: prev.etag }).then(() => bump()).catch(e => toast('The last note was not saved: ' + (e as Error).message, 'err'))
     }
     window.clearTimeout(prev.timer)
-    setNote(null); setErr(''); setConflict(null); setStatus('saved'); setSheet(null); setMenu(false)
+    // The note on screen stays (and its editor with it) until the next one is here: no flash.
+    setErr(''); setConflict(null); setSheet(null); setMenu(false)
+    cur.current = { ...prev, id: 0, timer: 0 }
     api.get<Note>(`${V1}/notes/${id}`).then(n => {
       if (!live) return
+      setStatus('saved')
       cur.current = { id, etag: n.etag, saved: n.content || '', draft: n.content || '', saving: false, again: false, timer: 0 }
       setNote(n); setTitle(n.title); setDraft(n.content || ''); setRevision(r => r + 1)
       if (n.path.toLowerCase().endsWith('.txt')) setMode('markdown')

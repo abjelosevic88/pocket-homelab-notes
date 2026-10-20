@@ -35,6 +35,9 @@ export function newNoteIn(category: string, navigate: (to: string) => void, bump
   api.post<Note>(`${V1}/notes`, { title: 'New note', category, content: '' }).then(n => { bump(); navigate(`/note/${n.id}?in=${encodeURIComponent(category)}`) }).catch(e => toast((e as Error).message, 'err'))
 }
 
+/** The part of the app a path belongs to: every note is part of the notes page. */
+const section = (path: string) => (path === '/' || path.startsWith('/note/') ? 'notes' : path.split('/')[1])
+
 export default function Layout() {
   const { user, settings, status, theme, toggleTheme, setUser, folders, tags, sync, bump, reloadTree } = useApp()
   const { toast } = useToast()
@@ -146,7 +149,7 @@ export default function Layout() {
           <button className="btn ghost icon" onClick={() => setSwitcher(true)} aria-label="Find">⌕</button>
           <button className="btn ghost icon" onClick={newNote} aria-label="New note">＋</button>
         </header>
-        <main className="content"><ErrorBoundary key={loc.pathname} where={loc.pathname}><Outlet /></ErrorBoundary></main>
+        <main className="content"><ErrorBoundary key={section(loc.pathname)} where={loc.pathname}><Outlet /></ErrorBoundary></main>
       </div>
       {switcher && <QuickSwitcher onClose={() => setSwitcher(false)} onNew={() => { setSwitcher(false); newNote() }} onToday={() => { setSwitcher(false); openToday() }} />}
       {folderMenu && <div className="ctx-menu" style={{ left: folderMenu.x, top: folderMenu.y }} onMouseLeave={() => setFolderMenu(null)}>

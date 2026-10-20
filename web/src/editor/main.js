@@ -144,16 +144,27 @@ async function load(markdown, options) {
   document.body.classList.toggle('phone', !options.desktop && !options.compact)
   closeEmojiPicker(); closeTurnIntoMenu()
   removePalette?.(); removePalette = null; togglePalette = null; closeLinkForm()
+  // A still picture of the note on screen stays on top until the next one is drawn, so
+  // changing notes never flashes an empty page.
+  const root = document.getElementById('editor')
+  const curtain = root.querySelector(':scope > .editor-host') ? root.querySelector(':scope > .editor-host').cloneNode(true) : null
   if (crepe) { const old = crepe; crepe = null; try { await old.destroy() } catch (e) {} }
   if (run !== generation) { return false }
-  const root = document.getElementById('editor'); root.innerHTML = ''
+  root.innerHTML = ''
+  if (curtain) {
+    curtain.className = 'editor-curtain'; curtain.setAttribute('aria-hidden', 'true'); curtain.inert = true
+    curtain.querySelectorAll('[contenteditable]').forEach((el) => el.removeAttribute('contenteditable'))
+    root.append(curtain)
+  }
+  const host = document.createElement('div'); host.className = 'editor-host'; root.prepend(host)
+  const lift = () => { if (curtain) { curtain.remove() } }
   lastSent = null; baseline = null; documentID = options.document || null
   attachments.noteID = options.noteID == null ? null : options.noteID
   setTools(options.tools)
   setRunner(options.run, () => (crepe ? crepe.editor.action((ctx) => ctx.get(editorViewCtx)) : null))
   const doc = documentID
   const editor = new Crepe({
-    root,
+    root: host,
     defaultValue: fromNextcloud(markdown || ''),
     features: {
       [Crepe.Feature.Latex]: false, [Crepe.Feature.TopBar]: false, [Crepe.Feature.AI]: false,
@@ -189,11 +200,13 @@ async function load(markdown, options) {
     await editor.create()
   } catch (error) {
     // A note the editor cannot read stays untouched: the app falls back to plain Markdown.
+    lift()
     post('failed', { message: String(error && error.message ? error.message : error) })
     return false
   }
   if (run !== generation) { try { await editor.destroy() } catch (e) {} return false }
   crepe = editor
+  lift()
   // What the editor makes of the note before anything is typed. Only a difference from it
   // goes back to the app: opening a note never rewrites it.
   baseline = toNextcloud(editor.getMarkdown())
