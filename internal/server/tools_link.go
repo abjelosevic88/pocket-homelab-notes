@@ -17,9 +17,9 @@ import (
 	"unicode/utf8"
 )
 
-// Links to what lives elsewhere (Nextcloud files, Pocket Documents, books in
-// Pocket Bookshelf, podcast episodes, Forgejo issues, Jellyfin titles, Immich
-// photos) and web bookmarks. The note gets a
+// Links to what lives elsewhere (Nextcloud files, people in Pocket Contacts,
+// Pocket Documents, books in Pocket Bookshelf, podcast episodes, Forgejo
+// issues, Jellyfin titles, Immich photos) and web bookmarks. The note gets a
 // link, not a copy.
 
 // webLinkMarkdown is a Markdown link to an absolute address: brackets and line
@@ -38,6 +38,11 @@ type linkItem struct {
 	URL      string `json:"url"`
 	Icon     string `json:"icon"`
 	Markdown string `json:"markdown"`
+	// A person from Pocket Contacts: their picture (this server's copy), or
+	// initials on a colour.
+	Photo    string `json:"photo,omitempty"`
+	Initials string `json:"initials,omitempty"`
+	Color    string `json:"color,omitempty"`
 }
 
 type linkSection struct {
@@ -57,6 +62,7 @@ var linkSources = []struct {
 	Search              linkSearcher
 }{
 	{"svc", "nextcloud", "Nextcloud", linkNextcloud},
+	{"app", "contacts", "Pocket Contacts", linkContacts},
 	{"app", "documents", "Pocket Documents", linkDocuments},
 	{"app", "bookshelf", "Pocket Bookshelf", linkBooks},
 	{"app", "podcasts", "Pocket Podcasts", linkEpisodes},

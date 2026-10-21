@@ -1,6 +1,7 @@
 # Notes about things in other apps
 
-A book in Pocket Bookshelf, an episode in Pocket Podcasts, a trip in Pocket Travel: the notes
+A book in Pocket Bookshelf, an episode in Pocket Podcasts, a trip in Pocket Travel, a person in
+Pocket Contacts: the notes
 about it are ordinary notes in Pocket Notes. A note is *about* a thing when it **links to the
 thing's page** in its app. Nothing else is stored anywhere: no notes field in each app, no
 table of attachments. The link is the relation, it reads well in any Markdown editor, and it
@@ -17,6 +18,14 @@ Picking one inserts `[📖 Dune — Frank Herbert](…/books/12)` or `[🎧 Epis
 an episode you are part-way through is offered a second time at the moment reached
 (`…/episodes/7?t=754`). Pasting a book's or an episode's address by hand works the same. Notes
 reaches the two apps through Pocket Core (links `books:read`, `history:read`).
+
+People in Pocket Contacts come up there too (with their picture or initials), and while typing:
+**`@` and a letter or more** of a name, in the rich editor and in Markdown mode, lists the people
+whose names match (`GET /api/v1/tools/contacts?q=`, asked of Contacts as the person, link
+`contacts:read`). Return, Tab or a click writes `[Marko Petrović](https://contacts…/contacts/12)`,
+the person's page, which lists the note in its Notes box; Escape, or nothing matching, leaves the
+`@` as typed. `@today` and the other dates work as before. With Contacts switched off in Settings
+→ Integrations (or no link in Core) the list never asks and `@` is plain text.
 
 ## The two calls
 

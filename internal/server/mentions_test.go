@@ -34,3 +34,24 @@ func TestMentions(t *testing.T) {
 		t.Fatalf("bad url: %d", c)
 	}
 }
+
+// A person in Pocket Contacts is their page, /contacts/<id>: a note linking
+// to contact 12 is found for it, one linking to contact 123 is not.
+func TestMentionsContactPage(t *testing.T) {
+	h := newHarness(t)
+	_, tok := h.user("me@example.com")
+	var marko, other store.Note
+	h.do(tok, "POST", "/api/v1/notes", map[string]any{"title": "Kickoff", "content": "# Kickoff\n\nWith [Marko Petrović](https://contacts.example/contacts/12) and others.\n"}, &marko)
+	h.do(tok, "POST", "/api/v1/notes", map[string]any{"title": "Someone else", "content": "[Marija Ilić](https://contacts.example/contacts/123)\n"}, &other)
+
+	var got []store.Note
+	if c := h.do(tok, "GET", "/api/v1/mentions?url="+url.QueryEscape("https://contacts.example/contacts/12"), nil, &got); c != 200 || len(got) != 1 || got[0].ID != marko.ID {
+		t.Fatalf("contact 12: %d %+v", c, got)
+	}
+	if h.do(tok, "GET", "/api/v1/mentions?url="+url.QueryEscape("https://contacts.example/contacts/123"), nil, &got); len(got) != 1 || got[0].ID != other.ID {
+		t.Fatalf("contact 123: %+v", got)
+	}
+	if h.do(tok, "GET", "/api/v1/mentions?url="+url.QueryEscape("https://contacts.example/contacts/1"), nil, &got); len(got) != 0 {
+		t.Fatalf("contact 1 matched %+v", got)
+	}
+}

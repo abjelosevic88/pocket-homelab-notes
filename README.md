@@ -64,8 +64,10 @@ Notes apps and the Pocket Homelab app work against it too.
 - Title follows the first line, as in Nextcloud Notes (or not — your choice).
 
 **Homelab tools** in the `/` menu (each shown when its service is connected)
-- *Link to something*: Nextcloud files (full-text), Pocket Documents (full text and OCR), Forgejo issues and pull
-  requests, Jellyfin titles, Immich photos — the note gets a link, not a copy.
+- *Link to something*: Nextcloud files (full-text), people in Pocket Contacts, Pocket Documents (full text and
+  OCR), Forgejo issues and pull requests, Jellyfin titles, Immich photos — the note gets a link, not a copy.
+- *@ and a name* while typing: the people in Pocket Contacts whose names match; the one picked becomes a link to
+  their page there, which lists the note.
 - *From Photos* (Immich, smart search) and *From Nextcloud*: put pictures and files into a note.
 - *Make this line a task* (Nextcloud Tasks or Deck) and *Make this line a transaction* (Pocket
   Money): the line stays, with a link to where it went.

@@ -51,7 +51,7 @@ var serviceNames = map[string]string{
 	"jellystat": "Jellystat", "audiobookshelf": "Audiobookshelf", "kuma": "Uptime Kuma", "scrutiny": "Scrutiny", "backrest": "Backrest",
 	"adguard": "AdGuard Home", "glances": "Glances", "beszel": "Beszel",
 	"habits": "Pocket Habits", "money": "Pocket Money", "garage": "Pocket Garage", "podcasts": "Pocket Podcasts", "documents": "Pocket Documents", "bookshelf": "Pocket Bookshelf",
-	"files": "Pocket Files",
+	"contacts": "Pocket Contacts", "files": "Pocket Files",
 }
 
 // directFields says what a typed-in connection asks for: the key's label and
@@ -63,6 +63,7 @@ var directFields = map[string][2]string{
 	"kuma": {"API key (optional)", "Status page slug"}, "scrutiny": {"", ""}, "backrest": {"Password", "Username"}, "adguard": {"Password", "Username"},
 	"glances": {"", ""}, "beszel": {"Password", "Email"},
 	"habits": {"API token", ""}, "money": {"API token", ""}, "garage": {"API token", ""}, "podcasts": {"API token", ""}, "documents": {"API token", ""}, "bookshelf": {"API token", ""},
+	"contacts": {"API token", ""},
 }
 
 // errNotConnected is a tool asked for a service the person has not connected.
@@ -320,6 +321,9 @@ func (s *Server) toolRoutes(r chi.Router) {
 	// Links to what lives elsewhere, and bookmarks (tools_link.go).
 	r.Get("/tools/link", s.handleToolLink)
 	r.Post("/tools/bookmark", s.handleToolBookmark)
+	// People from Pocket Contacts for @ in the editor (tools_contacts.go).
+	r.Get("/tools/contacts", s.handleToolContacts)
+	r.Get("/tools/contacts/{id}/photo", s.handleToolContactPhoto)
 	// Pictures from Immich and files from Nextcloud (tools_media.go).
 	r.Get("/tools/photos", s.handleToolPhotos)
 	r.Get("/tools/photos/{asset}/thumb", s.handleToolPhotoThumb)
@@ -510,7 +514,7 @@ func (s *Server) handleTestIntegration(w http.ResponseWriter, r *http.Request) {
 // toolNeeds says what each editor tool needs: any one of the listed
 // services ("svc:x") or apps ("app:x") connected.
 var toolNeeds = map[string][]string{
-	"link":      {"svc:nextcloud", "app:documents", "app:bookshelf", "app:podcasts", "svc:forgejo", "svc:jellyfin", "svc:immich"},
+	"link":      {"svc:nextcloud", "app:contacts", "app:documents", "app:bookshelf", "app:podcasts", "svc:forgejo", "svc:jellyfin", "svc:immich"},
 	"photos":    {"svc:immich"},
 	"files":     {"svc:nextcloud"},
 	"bookmark":  {},
@@ -524,6 +528,7 @@ var toolNeeds = map[string][]string{
 	"habits":    {"app:habits"},
 	"task":      {"svc:nextcloud"},
 	"expense":   {"app:money"},
+	"contacts":  {"app:contacts"}, // people offered after @ in the editor
 }
 
 // connected reports whether a person can reach a service ("svc") or app

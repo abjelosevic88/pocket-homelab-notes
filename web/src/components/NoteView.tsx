@@ -2,7 +2,7 @@ import { forwardRef, useCallback, useEffect, useImperativeHandle, useMemo, useRe
 import { Link, useNavigate } from 'react-router-dom'
 import { api, ApiError, upload, V1, qs } from '../lib/api'
 import { useApp } from '../lib/app-context'
-import type { Note } from '../lib/types'
+import type { Note, Person } from '../lib/types'
 import { ago, headings, stamp, wordCount, leaf } from '../lib/format'
 import { Confirm, Loading, useToast } from './ui'
 import { RichEditor, type EditorMessage, type RichEditorHandle } from './RichEditor'
@@ -351,7 +351,14 @@ const NoteView = forwardRef<NoteViewHandle, { id: number; onBack?: () => void; e
       const list = await api.get<Note[]>(`${V1}/notes?sort=modified&limit=2000`)
       return { notes: list.filter(n => n.id !== cur.current.id).map(n => ({ id: n.id, title: n.title || 'Untitled', folder: n.category, url: noteURL(n.id) })) }
     }
+    if (m.name === 'contacts') return { contacts: await findPeople(String(m.q ?? '')) }
     return null
+  }
+
+  // People from Pocket Contacts for `@` and a name, in either editor: none when it is off or fails.
+  const findPeople = async (q: string): Promise<Person[]> => {
+    if (!q.trim() || !tools.contacts) return []
+    try { return (await api.get<{ contacts: Person[] }>(`${V1}/tools/contacts${qs({ q: q.trim(), limit: 6 })}`)).contacts || [] } catch { return [] }
   }
 
   const offered = useMemo(() => {
@@ -455,7 +462,7 @@ const NoteView = forwardRef<NoteViewHandle, { id: number; onBack?: () => void; e
             ? <RichEditor ref={rich} docKey={String(note.id)} revision={revision} content={draft} noteID={note.id} readonly={note.readonly} checkable tools={offered} theme={theme}
                 spellcheck={settings?.spellcheck} placeholder="Write, or type / for blocks and homelab tools" onChange={changed} onMessage={onMessage} onRequest={onRequest}
                 onFailed={msg => { toast(`The rich editor could not open this note (${msg}); showing Markdown.`, 'err'); setMode('markdown') }} />
-            : <MarkdownEditor ref={md} docKey={String(note.id)} revision={revision} content={draft} readonly={note.readonly} spellcheck={settings?.spellcheck} onChange={changed} onPasteFiles={uploadFiles} onOpenLink={u => openLink(u)} />}
+            : <MarkdownEditor ref={md} docKey={String(note.id)} revision={revision} content={draft} readonly={note.readonly} spellcheck={settings?.spellcheck} onChange={changed} onPasteFiles={uploadFiles} onOpenLink={u => openLink(u)} onPeople={findPeople} />}
         </div>
         {panel && <div className="panel-scrim" onClick={() => setPanel('')} />}
         {panel && <aside className="note-panel">

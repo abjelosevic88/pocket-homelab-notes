@@ -49,7 +49,10 @@ Add `X-Pocket-Source: shortcut` (or `app`) to have your changes named so in a no
 `GET/PUT /storage`, `POST /storage/test`, `POST /sync`, `GET/PUT /settings`, `GET /trash`,
 `POST /trash/{id}/restore`, `GET /export.zip`, `POST /import` (files or a zip), `GET /backup` (admin),
 `GET /integrations`, `PUT /integrations/{svc|app}/{name}`, `GET /tools` and the homelab tools under
-`/tools/…` (link search, bookmark, Immich photos, Nextcloud files, reports, task, expense).
+`/tools/…` (link search, bookmark, people from Pocket Contacts for `@` — `GET /tools/contacts?q=` →
+`{enabled, contacts: [{id, name, detail, initials, color, photo, url, markdown}]}`, `enabled: false` when
+Contacts is off — and their pictures `GET /tools/contacts/{id}/photo?s=`, Immich photos, Nextcloud files,
+reports, task, expense).
 
 ## Shortcuts
 

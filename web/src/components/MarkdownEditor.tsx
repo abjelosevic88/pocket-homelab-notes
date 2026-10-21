@@ -3,9 +3,10 @@ import { EditorState, EditorSelection, Compartment, type Extension } from '@code
 import { EditorView, keymap, drawSelection, highlightActiveLine, placeholder as cmPlaceholder, dropCursor } from '@codemirror/view'
 import { defaultKeymap, history, historyKeymap, indentWithTab } from '@codemirror/commands'
 import { markdown, markdownLanguage } from '@codemirror/lang-markdown'
-import { syntaxHighlighting, HighlightStyle, indentOnInput, bracketMatching } from '@codemirror/language'
+import { syntaxHighlighting, syntaxTree, HighlightStyle, indentOnInput, bracketMatching } from '@codemirror/language'
 import { searchKeymap, highlightSelectionMatches } from '@codemirror/search'
-import { closeBrackets } from '@codemirror/autocomplete'
+import { autocompletion, closeBrackets, type Completion, type CompletionContext, type CompletionResult } from '@codemirror/autocomplete'
+import type { Person } from '../lib/types'
 import { tags as t } from '@lezer/highlight'
 
 // The note as Markdown, every character of it: the plain editor for people who want to see and
@@ -30,6 +31,29 @@ interface Props {
   onChange: (md: string) => void
   onPasteFiles?: (files: File[]) => Promise<string[]>
   onOpenLink?: (url: string) => void
+  /** People from Pocket Contacts for `@` and a name ([] when it is off). */
+  onPeople?: (q: string) => Promise<Person[]>
+}
+
+// `@` and a name at the start of a line or after a space (an address like name@host is left
+// alone): at most two words, so a sentence typed after an @ soon stops asking.
+const mentionRe = /(?:^|\s)@([\p{L}\p{M}][\p{L}\p{M}\p{N}'’.-]{0,30}(?: [\p{L}\p{M}\p{N}'’.-]{0,30})?)$/u
+
+/** A person's picture, or their initials on their colour, in front of the name in the list. */
+function personIcon(c: Completion): Node | null {
+  const p = (c as Completion & { person?: Person }).person
+  if (!p) return null
+  const el = document.createElement('span')
+  el.className = 'cm-person-avatar'
+  el.style.background = p.color || ''
+  el.textContent = p.initials || ''
+  if (p.photo) {
+    const img = document.createElement('img')
+    img.src = p.photo; img.alt = ''
+    img.onerror = () => img.remove()
+    el.append(img)
+  }
+  return el
 }
 
 const style = HighlightStyle.define([
@@ -56,6 +80,13 @@ const theme = EditorView.theme({
   '.cm-selectionBackground, &.cm-focused .cm-selectionBackground, ::selection': { backgroundColor: 'var(--selection) !important' },
   '.cm-cursor': { borderLeftColor: 'var(--accent)' },
   '.cm-placeholder': { color: 'var(--muted)' },
+  '.cm-tooltip.cm-tooltip-autocomplete': { border: '1px solid var(--border)', borderRadius: '10px', background: 'var(--surface)', boxShadow: '0 12px 36px #0003', overflow: 'hidden' },
+  '.cm-tooltip.cm-tooltip-autocomplete > ul': { fontFamily: 'var(--font)', maxHeight: '300px', padding: '4px' },
+  '.cm-tooltip.cm-tooltip-autocomplete > ul > li': { display: 'flex', alignItems: 'center', gap: '8px', padding: '5px 8px', borderRadius: '6px' },
+  '.cm-tooltip.cm-tooltip-autocomplete > ul > li[aria-selected]': { background: 'var(--accent)', color: '#fff' },
+  '.cm-completionDetail': { marginLeft: 'auto', paddingLeft: '10px', fontStyle: 'normal', opacity: '.75', fontSize: '12px' },
+  '.cm-person-avatar': { position: 'relative', width: '22px', height: '22px', borderRadius: '50%', display: 'inline-grid', placeItems: 'center', fontSize: '10px', fontWeight: '700', color: '#fff', flexShrink: '0', overflow: 'hidden', background: 'var(--accent)' },
+  '.cm-person-avatar img': { position: 'absolute', inset: '0', width: '100%', height: '100%', objectFit: 'cover' },
 })
 
 const taskRe = /^(\s*(?:[-*+]|\d+[.)])\s+\[)([ xX])(\])/
@@ -70,8 +101,39 @@ export const MarkdownEditor = forwardRef<MarkdownEditorHandle, Props>(function M
   const shown = useRef<{ doc: string; revision: number } | null>(null)
   const exts = useRef<Extension[]>([])
 
+  // `@mar` lists the people whose names match; taking one writes a link to their page.
+  async function people(cx: CompletionContext): Promise<CompletionResult | null> {
+    const find = latest.current.onPeople
+    if (!find) return null
+    const line = cx.state.doc.lineAt(cx.pos)
+    const m = mentionRe.exec(line.text.slice(Math.max(0, cx.pos - line.from - 80), cx.pos - line.from))
+    if (!m) return null
+    const node = syntaxTree(cx.state).resolveInner(cx.pos, -1)
+    for (let n: typeof node | null = node; n; n = n.parent) if (/Code|URL|LinkMark/.test(n.name)) return null
+    const q = m[1].replace(/[.'’-]+$/, '').trim()
+    if (!q) return null
+    // A pause in typing first: no question per letter.
+    await new Promise(r => setTimeout(r, 150))
+    if (cx.aborted) return null
+    let found: Person[] = []
+    try { found = await find(q) } catch { return null }
+    if (cx.aborted || !found.length) return null
+    const from = cx.pos - m[1].length - 1
+    return {
+      from, filter: false,
+      options: found.map(p => ({
+        label: p.name, detail: p.detail, type: 'person', person: p,
+        apply: (view: EditorView, _c: Completion, at: number, to: number) => {
+          const text = p.markdown + ' '
+          view.dispatch({ changes: { from: at, to, insert: text }, selection: EditorSelection.cursor(at + text.length), scrollIntoView: true })
+        },
+      }) as Completion),
+    }
+  }
+
   useEffect(() => {
     exts.current = [
+          autocompletion({ override: [people], icons: false, addToOptions: [{ render: personIcon, position: 20 }] }),
           history(), drawSelection(), dropCursor(), highlightActiveLine(), indentOnInput(), bracketMatching(), closeBrackets(), highlightSelectionMatches(),
           markdown({ base: markdownLanguage }), syntaxHighlighting(style), EditorView.lineWrapping, theme,
           cmPlaceholder('Write in Markdown…'),

@@ -17,10 +17,10 @@ export function toolError(e: unknown): string {
 
 // ---------------------------------------------------------------- link
 
-interface LinkItem { id: string; title: string; detail: string; url: string; icon: string; markdown: string }
+interface LinkItem { id: string; title: string; detail: string; url: string; icon: string; markdown: string; photo?: string; initials?: string; color?: string }
 interface LinkAnswer { sections: { source: string; title: string; items: LinkItem[] }[]; errors?: Record<string, string>; note?: string }
 
-const ICONS: Record<string, string> = { file: '📄', folder: '📁', document: '🧾', book: '📖', podcast: '🎧', moment: '⏱', issue: '◎', pull: '⇄', movie: '🎬', series: '📺', episode: '📺', photo: '🖼', link: '🔗' }
+const ICONS: Record<string, string> = { person: '👤', file: '📄', folder: '📁', document: '🧾', book: '📖', podcast: '🎧', moment: '⏱', issue: '◎', pull: '⇄', movie: '🎬', series: '📺', episode: '📺', photo: '🖼', link: '🔗' }
 
 export function LinkPicker({ onPick, onClose }: { onPick: (md: string) => void; onClose: () => void }) {
   const [q, setQ] = useState('')
@@ -38,7 +38,7 @@ export function LinkPicker({ onPick, onClose }: { onPick: (md: string) => void; 
   const sections = data?.sections?.filter(s => s.items.length) || []
   return (
     <Modal title="Link to something" onClose={onClose} size="lg">
-      <div className="tool-search"><span className="muted">⌕</span><input autoFocus value={q} onChange={e => setQ(e.target.value)} placeholder="Search files, documents, books, episodes, issues, films, photos…" />{busy && <span className="spinner" />}</div>
+      <div className="tool-search"><span className="muted">⌕</span><input autoFocus value={q} onChange={e => setQ(e.target.value)} placeholder="Search people, files, documents, books, episodes, issues, films, photos…" />{busy && <span className="spinner" />}</div>
       <div className="tool-results">
         {err && <div className="callout danger">{err}</div>}
         {!sections.length && !busy && !err && <p className="muted center pad">{q.trim().length < 2 ? 'Type a few letters. The note gets a link to what you pick, not a copy.' : `Nothing matches “${q}”.`}</p>}
@@ -47,7 +47,7 @@ export function LinkPicker({ onPick, onClose }: { onPick: (md: string) => void; 
             <h4>{s.title}</h4>
             {s.items.map(it => (
               <button key={it.id} className="tool-row" onClick={() => onPick(it.markdown || `[${it.title}](${it.url})`)}>
-                <span className="ico">{ICONS[it.icon] || '🔗'}</span>
+                {it.icon === 'person' ? <PersonAvatar item={it} /> : <span className="ico">{ICONS[it.icon] || '🔗'}</span>}
                 <span className="grow"><b>{it.title}</b>{it.detail && <small className="muted">{it.detail}</small>}</span>
               </button>
             ))}
@@ -58,6 +58,13 @@ export function LinkPicker({ onPick, onClose }: { onPick: (md: string) => void; 
       <p className="muted small mt">{data?.note || 'Each result becomes a link in the note. Nothing is copied.'}</p>
     </Modal>
   )
+}
+
+/** A person from Pocket Contacts: their picture, or their initials on their colour when there is none (or it fails). */
+function PersonAvatar({ item }: { item: LinkItem }) {
+  const [broken, setBroken] = useState(false)
+  if (item.photo && !broken) return <img className="avatar lg person-photo" src={item.photo} alt="" loading="lazy" onError={() => setBroken(true)} />
+  return <span className="avatar lg" style={{ background: item.color || undefined }} aria-hidden>{item.initials || '👤'}</span>
 }
 
 // ---------------------------------------------------------------- bookmark

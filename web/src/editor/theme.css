@@ -224,6 +224,10 @@ body.desktop:not(.compact) .milkdown .ProseMirror { box-sizing: border-box; widt
 .note-suggest-row small { font-size: 11px; color: var(--crepe-color-on-surface-variant); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .note-suggest-row.chosen { background: var(--accent); color: white; }
 .note-suggest-row.chosen small { color: rgba(255,255,255,.8); }
+.note-suggest-row.person { flex-direction: row; align-items: center; gap: 9px; }
+.note-suggest-words { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
+.note-suggest-avatar { position: relative; flex-shrink: 0; width: 26px; height: 26px; border-radius: 50%; overflow: hidden; display: inline-grid; place-items: center; font-size: 10.5px; font-weight: 700; color: white; background: var(--accent); }
+.note-suggest-avatar img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
 .note-suggest-empty { padding: 8px 10px; color: var(--crepe-color-on-surface-variant); }
 
 /* The same editor tools sit above the page on Mac and above the keyboard on iPhone.

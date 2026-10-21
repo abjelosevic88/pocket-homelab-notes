@@ -90,3 +90,17 @@ export interface Dashboard { notes: number; edited_today: number; edited_week: n
 export interface APIToken { id: number; name: string; prefix: string; last_used_at?: string; created_at: string }
 
 export type Tools = Record<string, boolean>
+
+/** A person from Pocket Contacts, for `@` and a name in a note (GET /api/v1/tools/contacts). */
+export interface Person {
+  id: string
+  name: string
+  detail: string
+  initials: string
+  color: string
+  /** This server's copy of their picture, "" when none. */
+  photo: string
+  /** Their page in Pocket Contacts. */
+  url: string
+  markdown: string
+}
