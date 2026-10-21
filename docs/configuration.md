@@ -17,7 +17,7 @@ Settings, not here.
 | `SESSION_TTL` | `720h` | How long a sign-in lasts. |
 | `SECURE_COOKIES` | `false` | Set behind HTTPS. |
 | `OIDC_ISSUER` / `OIDC_CLIENT_ID` / `OIDC_CLIENT_SECRET` / `OIDC_NAME` / `OIDC_AUTO_CREATE` | — | Sign in with an OpenID Connect provider. Not needed with Pocket Core. |
-| `CORE_URL` / `CORE_REGISTRATION_KEY` / `CORE_APP_URL` | — | Pocket Core: the app registers, offers "Sign in with Pocket Core", publishes `notes.*` events, and reaches each person's services (Nextcloud, Immich, Forgejo …) and Pocket apps (Habits, Money, Garage, Podcasts, Documents) through Core. |
+| `CORE_URL` / `CORE_REGISTRATION_KEY` / `CORE_APP_URL` | — | Pocket Core: the app registers, offers "Sign in with Pocket Core", publishes `notes.*` events, and reaches each person's services (Nextcloud, Immich, Forgejo …) and Pocket apps (Habits, Money, Garage, Podcasts, Documents) through Core; offers Pocket Files as a place for the notes. |
 | `NOTIFY_URL` / `NOTIFY_KIND` | — / `apprise` | Where the owner hears that their notes folder stopped answering (`apprise`, `ntfy`, `webhook`). Everyone can set their own in Settings. |
 | `TRUST_PROXY` | `true` | Read the client address from `X-Forwarded-For`. |
 | `METRICS_ENABLED` | `true` | Prometheus metrics at `/metrics`. |

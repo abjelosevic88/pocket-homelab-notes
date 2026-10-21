@@ -26,8 +26,17 @@ type harness struct {
 
 func newHarness(t *testing.T) *harness {
 	t.Helper()
+	return newHarnessWith(t, nil)
+}
+
+// newHarnessWith lets a test change the configuration (CORE_URL …) first.
+func newHarnessWith(t *testing.T, change func(*config.Config)) *harness {
+	t.Helper()
 	dir := t.TempDir()
 	cfg := &config.Config{AuthMode: "local", SessionTTL: time.Hour, DataDir: dir, DBPath: dir + "/t.db", StorageRoots: []string{dir + "/shared"}}
+	if change != nil {
+		change(cfg)
+	}
 	log := slog.New(slog.NewTextHandler(io.Discard, nil))
 	st, err := store.Open(cfg.DBPath, log)
 	if err != nil {

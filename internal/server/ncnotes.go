@@ -61,10 +61,11 @@ func (s *Server) toNC(ctx context.Context, uid int64, n *store.Note, exclude map
 }
 
 // ncNotesPath is the notes folder as Nextcloud would name it: the folder in
-// the person's Nextcloud when that is where the notes are, "Notes" otherwise.
+// the person's Nextcloud (or Pocket Files) when that is where the notes are,
+// "Notes" otherwise.
 func (s *Server) ncNotesPath(ctx context.Context, uid int64) string {
 	st, _ := s.store.GetSettings(ctx, uid)
-	if st.StorageKind == "nextcloud" && st.StorageFolder != "" {
+	if (st.StorageKind == "nextcloud" || st.StorageKind == "files") && st.StorageFolder != "" {
 		return st.StorageFolder
 	}
 	return "Notes"

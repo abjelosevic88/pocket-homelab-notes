@@ -39,6 +39,11 @@ var serviceUses = []core.ServiceUse{
 	{Type: "beszel", Reason: "The homelab snapshot: systems with CPU, memory, disk and temperature"},
 }
 
+// libraryOnlyApps are Pocket apps Notes links to only to keep the notes
+// folder there (Settings → Storage, always through Pocket Core): they have no
+// row under Integrations, where a typed-in connection would mean nothing.
+var libraryOnlyApps = map[string]bool{"files": true}
+
 // serviceNames are the names people see.
 var serviceNames = map[string]string{
 	"tasks":     "Pocket Tasks",
@@ -46,6 +51,7 @@ var serviceNames = map[string]string{
 	"jellystat": "Jellystat", "audiobookshelf": "Audiobookshelf", "kuma": "Uptime Kuma", "scrutiny": "Scrutiny", "backrest": "Backrest",
 	"adguard": "AdGuard Home", "glances": "Glances", "beszel": "Beszel",
 	"habits": "Pocket Habits", "money": "Pocket Money", "garage": "Pocket Garage", "podcasts": "Pocket Podcasts", "documents": "Pocket Documents", "bookshelf": "Pocket Bookshelf",
+	"files": "Pocket Files",
 }
 
 // directFields says what a typed-in connection asks for: the key's label and
@@ -394,7 +400,9 @@ func (s *Server) handleIntegrations(w http.ResponseWriter, r *http.Request) {
 		add("svc", u.Type, u.Reason)
 	}
 	for _, u := range linkUses {
-		add("app", u.App, u.Reason)
+		if !libraryOnlyApps[u.App] {
+			add("app", u.App, u.Reason)
+		}
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"core": s.core.Configured(), "items": out})
 }
@@ -410,7 +418,7 @@ func validIntegration(kind, name string) bool {
 	if kind == "app" {
 		for _, u := range linkUses {
 			if u.App == name {
-				return true
+				return !libraryOnlyApps[name]
 			}
 		}
 	}

@@ -124,6 +124,7 @@ function goFormat(layout: string, d: Date): string {
 const KINDS: { kind: StorageKind; title: string; sub: string }[] = [
   { kind: 'builtin', title: 'In Pocket Notes', sub: 'Kept in Pocket Notes’ own data and backed up with it. Nothing to set up.' },
   { kind: 'nextcloud', title: 'Nextcloud', sub: 'A folder in your Nextcloud — the one Nextcloud Notes uses, if you like. Both see the same notes.' },
+  { kind: 'files', title: 'Pocket Files', sub: 'A folder in your Pocket Files, through Pocket Core. Nothing to type.' },
   { kind: 'webdav', title: 'WebDAV', sub: 'Any WebDAV folder: ownCloud, a NAS, Synology, Seafile…' },
   { kind: 'folder', title: 'Your own folder', sub: 'A folder the server shares with Pocket Notes (a NAS mount, Syncthing, Obsidian vault).' },
 ]
@@ -173,7 +174,7 @@ function Storage() {
       </Card>
       <Card title="Change where they are">
         <div className="storage-kinds">
-          {KINDS.filter(k => k.kind !== 'folder' || (data.roots && data.roots.length)).map(k => (
+          {KINDS.filter(k => (k.kind !== 'folder' || (data.roots && data.roots.length)) && (k.kind !== 'files' || data.core || data.kind === 'files')).map(k => (
             <button key={k.kind} className={`storage-kind ${f.kind === k.kind ? 'active' : ''}`} onClick={() => set({ kind: k.kind })}><b>{k.title}</b><small className="muted">{k.sub}</small></button>
           ))}
         </div>
@@ -190,6 +191,12 @@ function Storage() {
               </div>
             </>}
             <Field label="Folder in your Nextcloud" help="Nextcloud Notes keeps notes in “Notes” unless its settings say otherwise (yours may be e.g. Nextcloud/Notes)."><input value={f.folder} onChange={e => set({ folder: e.target.value })} placeholder="Notes" /></Field>
+          </>}
+          {f.kind === 'files' && <>
+            {!data.core ? <div className="callout warning">Pocket Files is reached through Pocket Core, and this server is not connected to one.</div>
+              : data.core_files?.on ? <p className="muted">Pocket Core lets Pocket Notes into your Pocket Files{data.core_files.url ? <> at {data.core_files.url}</> : ''}. Nothing to type. Notes deleted here go to your Pocket Files trash.</p>
+              : <div className="callout warning">Pocket Core does not let Pocket Notes into your Pocket Files{data.core_files?.reason ? `: ${data.core_files.reason}` : ''}. The link is “Pocket Notes → Pocket Files” in Core → Links.</div>}
+            <Field label="Folder in your Pocket Files" help="A folder of your own there (not “Shared with me” or “Mounts” themselves); made when it is not there yet."><input value={f.folder} onChange={e => set({ folder: e.target.value })} placeholder="Notes" /></Field>
           </>}
           {f.kind === 'webdav' && <>
             <Field label="Address of the folder" help="The full WebDAV address of the folder that holds (or will hold) the notes."><input value={f.url} onChange={e => set({ url: e.target.value })} placeholder="https://dav.example.com/remote.php/webdav/Notes" spellCheck={false} /></Field>
@@ -450,7 +457,7 @@ function About() {
   const core = (data?.core || {}) as { configured: boolean; url: string; registered: boolean; error: string }
   return (
     <Card title="About">
-      <p><b>Pocket Notes</b> keeps your notes as plain Markdown files where you choose — on this server, in your Nextcloud, on any WebDAV server or in a folder — and adds full-text search, tags, links between notes, tasks, daily notes, version history, a trash, shared links, a rich editor with homelab tools, and Nextcloud Notes' own API for its apps.</p>
+      <p><b>Pocket Notes</b> keeps your notes as plain Markdown files where you choose — on this server, in your Nextcloud or Pocket Files, on any WebDAV server or in a folder — and adds full-text search, tags, links between notes, tasks, daily notes, version history, a trash, shared links, a rich editor with homelab tools, and Nextcloud Notes' own API for its apps.</p>
       <p className="muted small">Open source (MIT) — <a href="https://github.com/abjelosevic88/pocket-homelab-notes" target="_blank" rel="noreferrer">github.com/abjelosevic88/pocket-homelab-notes</a>. One of the Pocket apps.</p>
       {data && (
         <table className="table compact mt">

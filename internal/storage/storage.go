@@ -1,7 +1,8 @@
 // Package storage is where a person's notes live: plain Markdown files in a
-// folder tree, on this server or on a WebDAV server such as Nextcloud. The
-// database only indexes them; the files stay the truth, so any other app that
-// reads the folder (Nextcloud Notes, Obsidian, a text editor) sees the same notes.
+// folder tree, on this server or on a WebDAV server such as Nextcloud or
+// Pocket Files. The database only indexes them; the files stay the truth, so
+// any other app that reads the folder (Nextcloud Notes, Obsidian, a text
+// editor) sees the same notes.
 package storage
 
 import (
@@ -40,7 +41,7 @@ type Entry struct {
 
 // Backend is one storage location.
 type Backend interface {
-	// Kind names the backend: builtin | folder | webdav | nextcloud.
+	// Kind names the backend: builtin | folder | webdav | nextcloud | files.
 	Kind() string
 	// Describe says where the notes are, for people ("Nextcloud · Notes").
 	Describe() string

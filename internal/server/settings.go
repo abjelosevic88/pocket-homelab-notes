@@ -224,6 +224,15 @@ func (in storageInput) apply(cur store.Settings) (store.Settings, error) {
 				return st, errors.New("your Nextcloud username is needed")
 			}
 		}
+	case "files":
+		f, err := storage.Clean(strings.TrimSpace(in.Folder))
+		if err != nil {
+			return st, err
+		}
+		if f == "" {
+			return st, errors.New("choose a folder in your Pocket Files (e.g. Notes)")
+		}
+		st.StorageFolder, st.StorageViaCore = f, true
 	default:
 		return st, errors.New("unknown storage kind")
 	}
@@ -247,6 +256,8 @@ func samePlace(a, b store.Settings) bool {
 		return a.StorageURL == b.StorageURL
 	case "nextcloud":
 		return a.StorageFolder == b.StorageFolder && (a.StorageViaCore == b.StorageViaCore || a.StorageURL == b.StorageURL)
+	case "files":
+		return a.StorageFolder == b.StorageFolder
 	}
 	return true
 }
@@ -271,6 +282,17 @@ func (s *Server) handleGetStorage(w http.ResponseWriter, r *http.Request) {
 			out["core_nextcloud"] = map[string]any{"url": firstNonEmpty(cred.PublicURL, cred.URL), "user": cred.Fields["USERNAME"]}
 		} else {
 			out["core_nextcloud_error"] = err.Error()
+		}
+		// Pocket Files is offered when Core lets Notes in for this person;
+		// otherwise the reason (the link off in Core → Links, Files missing).
+		if on, why := s.core.LinkOn(cctx, s.userEmail(ctx, uid), "files", useScopes("files")...); on {
+			pf := map[string]any{"on": true}
+			if r, err := s.core.Resolve(cctx, "files"); err == nil {
+				pf["url"] = firstNonEmpty(r.PublicURL, r.URL)
+			}
+			out["core_files"] = pf
+		} else {
+			out["core_files"] = map[string]any{"on": false, "reason": linkOffReason(why)}
 		}
 	}
 	writeJSON(w, http.StatusOK, out)
@@ -303,6 +325,25 @@ func (s *Server) probe(ctx context.Context, uid int64, st store.Settings) (stora
 		}
 	}
 	return b, map[string]any{"ok": true, "where": b.Describe(), "notes": notes, "folders": folders, "files": files}, nil
+}
+
+// linkOffReason says in words why Core does not let Notes into an app.
+func linkOffReason(state string) string {
+	switch state {
+	case "off_admin":
+		return "the link is switched off for the whole box (an admin turns it on in Pocket Core → Links)"
+	case "off_person":
+		return "you switched the link off in Pocket Core → Links"
+	case "target_missing":
+		return "Pocket Files is not registered with Pocket Core"
+	case "not_offered", "not_declared":
+		return "Pocket Core does not know this link yet"
+	case "not_in_audience":
+		return "you do not have access to Pocket Files"
+	case "":
+		return "Pocket Core did not say why"
+	}
+	return state
 }
 
 func storageErr(err error) string {

@@ -1,6 +1,6 @@
 <p align="center"><img src="web/public/favicon.svg" width="72" alt=""></p>
 <h1 align="center">Pocket Notes</h1>
-<p align="center">Self-hosted Markdown notes kept as plain files where you choose — on the server, in your Nextcloud, on any WebDAV server or in a folder.<br>One Go binary, one SQLite file, one volume.</p>
+<p align="center">Self-hosted Markdown notes kept as plain files where you choose — on the server, in your Nextcloud or Pocket Files, on any WebDAV server or in a folder.<br>One Go binary, one SQLite file, one volume.</p>
 
 Pocket Notes is a notes server that does what Nextcloud Notes does and a good deal more: full-text
 search, tags, links between notes with backlinks, every checkbox gathered into one task list, daily
@@ -45,7 +45,8 @@ Notes apps and the Pocket Homelab app work against it too.
 
 **Your notes, your files**
 - Each person chooses where their notes live: a folder on this server, a folder in **Nextcloud**
-  (through Pocket Core, nothing to type), any **WebDAV** server, or a folder on the server
+  (through Pocket Core, nothing to type), a folder in **Pocket Files** (through Pocket Core, a
+  short-lived link token as the WebDAV password), any **WebDAV** server, or a folder on the server
   (`STORAGE_ROOTS`). Moving copies everything over, or starts from what is already there.
 - Changes made elsewhere — Nextcloud Notes, a phone, Obsidian, a text editor — come in on their own;
   renamed files keep their history; deleted ones land in the trash with their text.

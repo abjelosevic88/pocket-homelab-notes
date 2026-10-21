@@ -13,6 +13,7 @@ import (
 	"sync"
 	"time"
 
+	core "github.com/abjelosevic88/pocket-homelab-core/sdk"
 	"github.com/abjelosevic88/pocket-homelab-notes/internal/notesmd"
 	"github.com/abjelosevic88/pocket-homelab-notes/internal/notify"
 	"github.com/abjelosevic88/pocket-homelab-notes/internal/storage"
@@ -199,9 +200,101 @@ func (s *Server) backendFor(ctx context.Context, uid int64, st store.Settings) (
 		}
 		b.UserAgent = ua
 		return b, nil
+	case "files":
+		return s.pocketFilesBackend(ctx, uid, st.StorageFolder)
 	default:
 		return storage.NewLocal(s.builtinDir(uid), "builtin", "Pocket Notes"), nil
 	}
+}
+
+// pocketFilesBackend is a folder in the person's Pocket Files, over its
+// WebDAV with a Pocket Core link token (files:read files:write) as the
+// password. Pocket Files has no file ids: notes there are known by their
+// path, and a file renamed outside is followed by its text, as on any WebDAV.
+func (s *Server) pocketFilesBackend(ctx context.Context, uid int64, folder string) (storage.Backend, error) {
+	if !s.core.Configured() {
+		return nil, errors.New("Pocket Files is reached through Pocket Core, and this server is not connected to one (CORE_URL)")
+	}
+	email := s.userEmail(ctx, uid)
+	if email == "" {
+		return nil, errors.New("Pocket Files through Pocket Core needs your account's email")
+	}
+	v, _ := s.filesToks.LoadOrStore(uid, &linkTokens{})
+	toks := v.(*linkTokens)
+	toks.setFetch(email, func(ctx context.Context) (*core.LinkToken, error) {
+		return s.core.ActAs(ctx, email, "files", useScopes("files")...)
+	})
+	lt, err := toks.get(ctx)
+	if err != nil {
+		return nil, err
+	}
+	b, err := storage.NewPocketFiles(lt.URL, folder, func(ctx context.Context) (string, string, error) {
+		t, err := toks.get(ctx)
+		if err != nil {
+			return "", "", err
+		}
+		return "pocket-notes", t.AccessToken, nil
+	})
+	if err != nil {
+		return nil, err
+	}
+	b.UserAgent, b.Renew = "PocketNotes/"+Version, toks.drop
+	return b, nil
+}
+
+// linkTokens keeps one person's Pocket Core link token for a few minutes
+// (they live five), so a sync is not a token request per file; a refused one
+// is dropped and asked for again. Core re-checks the switches on every new one.
+type linkTokens struct {
+	mu    sync.Mutex
+	who   string // whom the token acts for: another email drops it
+	fetch func(ctx context.Context) (*core.LinkToken, error)
+	tok   *core.LinkToken
+	until time.Time
+}
+
+func (t *linkTokens) setFetch(who string, fetch func(ctx context.Context) (*core.LinkToken, error)) {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	if t.who != who {
+		t.tok = nil
+	}
+	t.who, t.fetch = who, fetch
+}
+
+// linkTokenKeep is the longest a link token is used.
+const linkTokenKeep = 4 * time.Minute
+
+func (t *linkTokens) get(ctx context.Context) (*core.LinkToken, error) {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	if t.tok != nil && time.Now().Before(t.until) {
+		return t.tok, nil
+	}
+	lt, err := t.fetch(ctx)
+	if err != nil {
+		t.tok = nil
+		var le *core.LinkError
+		if errors.As(err, &le) {
+			return nil, fmt.Errorf("Pocket Files through Pocket Core: %s", le.Message)
+		}
+		return nil, fmt.Errorf("Pocket Files through Pocket Core: %w", err)
+	}
+	if lt.AccessToken == "" || lt.URL == "" {
+		return nil, errors.New("Pocket Files through Pocket Core: Core answered without a token or an address")
+	}
+	keep := linkTokenKeep
+	if life := time.Duration(lt.ExpiresIn)*time.Second - 30*time.Second; lt.ExpiresIn > 0 && life < keep {
+		keep = life
+	}
+	t.tok, t.until = lt, time.Now().Add(keep)
+	return lt, nil
+}
+
+func (t *linkTokens) drop() {
+	t.mu.Lock()
+	t.tok = nil
+	t.mu.Unlock()
 }
 
 func (s *Server) userEmail(ctx context.Context, uid int64) string {

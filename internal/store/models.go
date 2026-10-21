@@ -151,12 +151,12 @@ type Settings struct {
 	VersionsKeep int `json:"versions_keep"`
 
 	// Storage
-	StorageKind     string `json:"storage_kind"` // builtin | folder | webdav | nextcloud
+	StorageKind     string `json:"storage_kind"` // builtin | folder | webdav | nextcloud | files
 	StoragePath     string `json:"storage_path"` // folder: an absolute path under STORAGE_ROOTS
 	StorageURL      string `json:"storage_url"`  // webdav: the folder; nextcloud: the server
 	StorageUser     string `json:"storage_user"`
 	StoragePassword string `json:"-"`
-	StorageFolder   string `json:"storage_folder"`   // nextcloud: the folder inside the user's files
+	StorageFolder   string `json:"storage_folder"`   // nextcloud, files: the folder inside the person's files
 	StorageViaCore  bool   `json:"storage_via_core"` // nextcloud: the account Pocket Core holds for this person
 	SyncMinutes     int    `json:"sync_minutes"`
 

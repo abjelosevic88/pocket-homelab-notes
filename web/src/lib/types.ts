@@ -62,7 +62,7 @@ export interface Settings {
   core: boolean
 }
 
-export type StorageKind = 'builtin' | 'folder' | 'webdav' | 'nextcloud'
+export type StorageKind = 'builtin' | 'folder' | 'webdav' | 'nextcloud' | 'files'
 
 export interface SyncStats { files: number; added: number; changed: number; moved: number; removed: number; unchanged: boolean; at: string; took: string }
 export interface SyncStatus { syncing?: boolean; error?: string; failures?: number; last_sync?: string; kind?: string; where?: string; stats?: SyncStats }
@@ -80,6 +80,7 @@ export interface StorageInfo {
   status: SyncStatus
   core_nextcloud?: { url: string; user: string }
   core_nextcloud_error?: string
+  core_files?: { on: boolean; url?: string; reason?: string }
 }
 
 export interface Integration { kind: 'svc' | 'app'; name: string; title: string; reason: string; mode: 'core' | 'direct' | 'off'; url: string; public_url: string; user: string; key_set: boolean; key_label: string; user_label: string }

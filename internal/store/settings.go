@@ -93,7 +93,7 @@ func (s *Store) GetSettings(ctx context.Context, userID int64) (Settings, error)
 		case "versions_keep":
 			st.VersionsKeep = atoi(v, st.VersionsKeep)
 		case "storage_kind":
-			if v == "builtin" || v == "folder" || v == "webdav" || v == "nextcloud" {
+			if v == "builtin" || v == "folder" || v == "webdav" || v == "nextcloud" || v == "files" {
 				st.StorageKind = v
 			}
 		case "storage_path":

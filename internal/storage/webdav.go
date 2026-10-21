@@ -37,6 +37,12 @@ type WebDAV struct {
 	Label     string
 	HTTP      *http.Client
 	UserAgent string
+	// Renew, when set, is called once when the server refuses the credentials
+	// (HTTP 401) before the request is sent again: a short-lived token kept
+	// by Creds is dropped and a fresh one asked for.
+	Renew func()
+
+	kind string // overrides Kind() (a Pocket Files folder is "files")
 
 	basePath string // decoded path of Base, for reading hrefs
 }
@@ -77,7 +83,31 @@ func NewNextcloud(server, user, folder string, creds Credentials) (*WebDAV, erro
 	return w, nil
 }
 
+// NewPocketFiles returns a backend for folder (a path inside the person's
+// home, "Notes") on the Pocket Files at server, over its WebDAV (/dav/, the
+// home is the root). Creds answers a Pocket Core link token as the password.
+func NewPocketFiles(server, folder string, creds Credentials) (*WebDAV, error) {
+	server = strings.TrimRight(strings.TrimSpace(server), "/")
+	folder, err := Clean(folder)
+	if err != nil {
+		return nil, err
+	}
+	if folder == "" {
+		return nil, errors.New("choose a folder in your Pocket Files (e.g. Notes), not the whole of it")
+	}
+	root := server + "/dav"
+	w, err := NewWebDAV(root+"/"+escapePath(folder), creds, "Pocket Files · "+folder)
+	if err != nil {
+		return nil, err
+	}
+	w.MkBase, w.MkPath, w.kind = root, folder, "files"
+	return w, nil
+}
+
 func (w *WebDAV) Kind() string {
+	if w.kind != "" {
+		return w.kind
+	}
 	if w.Nextcloud {
 		return "nextcloud"
 	}
@@ -106,6 +136,16 @@ func (w *WebDAV) urlFor(p string) (string, error) {
 }
 
 func (w *WebDAV) do(ctx context.Context, method, target string, body []byte, hdr map[string]string) (*http.Response, error) {
+	res, err := w.send(ctx, method, target, body, hdr)
+	if err == nil && res.StatusCode == http.StatusUnauthorized && w.Renew != nil {
+		res.Body.Close()
+		w.Renew()
+		return w.send(ctx, method, target, body, hdr)
+	}
+	return res, err
+}
+
+func (w *WebDAV) send(ctx context.Context, method, target string, body []byte, hdr map[string]string) (*http.Response, error) {
 	var rd io.Reader
 	if body != nil {
 		rd = bytes.NewReader(body)

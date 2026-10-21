@@ -33,7 +33,7 @@ USER app
 WORKDIR /data
 HEALTHCHECK --interval=30s --timeout=5s --start-period=15s --retries=3 CMD curl -fsS http://localhost:8080/healthz || exit 1
 LABEL org.opencontainers.image.title="Pocket Notes" \
-      org.opencontainers.image.description="Self-hosted Markdown notes kept as plain files where you choose (built in, a folder, WebDAV or Nextcloud), with search, tags, links, tasks, daily notes, history, a rich editor with homelab tools and Nextcloud Notes' API." \
+      org.opencontainers.image.description="Self-hosted Markdown notes kept as plain files where you choose (built in, a folder, WebDAV, Nextcloud or Pocket Files), with search, tags, links, tasks, daily notes, history, a rich editor with homelab tools and Nextcloud Notes' API." \
       org.opencontainers.image.source="https://github.com/abjelosevic88/pocket-homelab-notes" \
       org.opencontainers.image.licenses="MIT"
 ENTRYPOINT ["pocket-notes"]

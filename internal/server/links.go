@@ -20,8 +20,10 @@ var linkOffers = []core.Offer{
 	{Scope: "notes:write", Name: "Write in your notes", Description: "Create notes, add lines to them and to today's daily note, tick tasks."},
 }
 
-// linkUses are the Pocket apps whose data the editor's homelab tools put into a note.
+// linkUses are the Pocket apps whose data the editor's homelab tools put into
+// a note, and Pocket Files, which can hold the notes folder itself.
 var linkUses = []core.Use{
+	{App: "files", Scopes: []string{"files:read", "files:write"}, Reason: "Keep your notes as Markdown files in Pocket Files"},
 	{App: "tasks", Scopes: []string{"tasks:read", "tasks:write"}, Reason: "Turn a line of a note into a Pocket Tasks task"},
 	{App: "habits", Scopes: []string{"habits:read", "entries:write"}, Reason: "Days of habits written into a note, and today's habits ticked on the Today page"},
 	{App: "money", Scopes: []string{"transactions:read", "transactions:write"}, Reason: "Spending this month in a note, and a line of a note made a transaction"},
@@ -111,7 +113,16 @@ func (s *Server) reportModes(ctx context.Context) {
 			modes = append(modes, core.ConnMode{User: email, Target: "service:" + u.Type, Mode: mode})
 		}
 		for _, u := range linkUses {
-			modes = append(modes, core.ConnMode{User: email, Target: u.App, Mode: s.integrationMode(ctx, uid, "app", u.App)})
+			var mode string
+			if libraryOnlyApps[u.App] {
+				mode = "off"
+				if st.StorageKind == u.App {
+					mode = "core"
+				}
+			} else {
+				mode = s.integrationMode(ctx, uid, "app", u.App)
+			}
+			modes = append(modes, core.ConnMode{User: email, Target: u.App, Mode: mode})
 		}
 	}
 	if err := s.core.ReportModes(ctx, modes); err != nil {

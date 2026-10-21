@@ -45,6 +45,9 @@ type Server struct {
 
 	libs   map[int64]*library
 	libsMu sync.Mutex
+	// filesToks keeps each person's Pocket Files link token (uid →
+	// *linkTokens), shared by their library and a storage test.
+	filesToks sync.Map
 
 	core    *core.Client
 	coreMu  sync.Mutex
@@ -391,7 +394,7 @@ func (s *Server) coreLoop(ctx context.Context) {
 func (s *Server) registerWithCore(ctx context.Context) error {
 	m := core.Manifest{
 		Slug: "notes", Name: "Pocket Notes",
-		Description: "Markdown notes kept as plain files where you choose (this server, a folder, WebDAV or your Nextcloud), with full-text search, tags, links between notes, tasks, daily notes, version history, trash, shared links, a rich editor with homelab tools, and Nextcloud Notes' own API for its apps.",
+		Description: "Markdown notes kept as plain files where you choose (this server, a folder, WebDAV, your Nextcloud or your Pocket Files), with full-text search, tags, links between notes, tasks, daily notes, version history, trash, shared links, a rich editor with homelab tools, and Nextcloud Notes' own API for its apps.",
 		Icon:        "/favicon.svg", Version: Version,
 		URL: s.cfg.CoreAppURL, PublicURL: s.cfg.BaseURL, HealthPath: "/healthz", EnvPrefix: "NOTES",
 		Publishes: []string{"notes.created", "notes.updated", "notes.deleted"},
