@@ -31,6 +31,6 @@ export default function NewFrom() {
       .catch(e => setErr((e as Error).message))
   }, [settings, params, navigate, bump])
 
-  if (err) return <div className="page"><div className="callout danger">{err}</div><p className="mt"><Link to="/">Back to your notes</Link></p></div>
-  return <div className="page"><Loading /></div>
+  if (err) return <div className="page"><div className="page-inner"><div className="callout danger">{err}</div><p className="mt"><Link to="/">Back to your notes</Link></p></div></div>
+  return <div className="page"><Loading label="Making the note…" /></div>
 }

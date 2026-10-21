@@ -4,7 +4,8 @@ import { api, V1, qs } from '../lib/api'
 import { useApp } from '../lib/app-context'
 import type { Note, TaskLine } from '../lib/types'
 import { ago, isoDay, today as todayISO } from '../lib/format'
-import { Loading, useToast } from '../components/ui'
+import { Empty, Loading, useToast } from '../components/ui'
+import { Icon } from '../components/icons'
 import NoteView, { type NoteViewHandle } from '../components/NoteView'
 
 // One day on one page: its note to write in, and what surrounds it — the week, the calendar,
@@ -124,7 +125,7 @@ export default function Today() {
   const tasksDue = data ? data.tasks.overdue.length + data.tasks.today.length : 0
 
   return (
-    <div className="today page">
+    <div className="today page"><div className="page-inner">
       <header className="today-head">
         <div className="grow">
           <div className="today-kicker">{isToday ? `${greeting(now.getHours())}${firstName ? `, ${firstName}` : ''}` : date < todayISO() ? 'Looking back' : 'Looking ahead'}</div>
@@ -136,9 +137,9 @@ export default function Today() {
           <span><b>{weather.t_max != null ? Math.round(weather.t_max) : '–'}°</b><span className="muted"> / {weather.t_min != null ? Math.round(weather.t_min) : '–'}°</span><br /><small className="muted">{weather.condition}{weather.precip_mm ? ` · ${weather.precip_mm} mm` : ''}</small></span>
         </div>}
         <div className="row today-nav">
-          <button className="btn icon" onClick={() => go(shift(date, -1))} aria-label="The day before">‹</button>
-          <button className="btn sm" onClick={() => go(todayISO())} disabled={isToday}>Today</button>
-          <button className="btn icon" onClick={() => go(shift(date, 1))} aria-label="The day after">›</button>
+          <button type="button" className="btn sm" onClick={() => go(todayISO())} disabled={isToday}>Today</button>
+          <button type="button" className="btn ghost icon-only" onClick={() => go(shift(date, -1))} aria-label="The day before" title="The day before"><Icon name="chevron-left" size={18} /></button>
+          <button type="button" className="btn ghost icon-only" onClick={() => go(shift(date, 1))} aria-label="The day after" title="The day after"><Icon name="chevron-right" size={18} /></button>
         </div>
       </header>
 
@@ -146,17 +147,17 @@ export default function Today() {
         {data.week.map(w => {
           const wd = day(w.date)
           return (
-            <button key={w.date} className={`wday ${w.date === date ? 'sel' : ''} ${w.date === data.today ? 'now' : ''}`} onClick={() => go(w.date)}>
+            <button type="button" key={w.date} className={`wday ${w.date === date ? 'sel' : ''} ${w.date === data.today ? 'now' : ''}`} onClick={() => go(w.date)}>
               <small>{wd.toLocaleDateString(undefined, { weekday: 'short' })}</small>
               <b>{wd.getDate()}</b>
-              <span className="marks">{w.daily ? <i className="dot daily" title="Daily note" /> : null}{w.edited > 0 ? <i className="dot edit" title={`${w.edited} edited`} /> : null}</span>
+              <span className="marks">{w.daily ? <i className="mark daily" title="Daily note" /> : null}{w.edited > 0 ? <i className="mark edit" title={`${w.edited} edited`} /> : null}</span>
             </button>
           )
         })}
-        <Link to="/calendar" className="wday cal-link" title="Calendar">▦</Link>
+        <Link to="/calendar" className="wday cal-link" title="Calendar" aria-label="Calendar"><Icon name="calendar" size={18} /></Link>
       </div>}
 
-      {err && <div className="callout danger mb">{err}</div>}
+      {err && <div className="callout danger mb"><Icon name="alert" size={15} /><span>{err}</span></div>}
       {!data && !err && <Loading />}
 
       {data && <div className="today-grid">
@@ -164,23 +165,21 @@ export default function Today() {
           <form className="capture-big" onSubmit={doCapture}>
             <span className="stamp" title={isToday ? 'Lines get the time they are added' : 'Lines go into this day’s note'}>{isToday ? stamp : d.toLocaleDateString(undefined, { day: 'numeric', month: 'short' })}</span>
             <input value={capture} onChange={e => setCapture(e.target.value)} placeholder={data.note ? 'Add a line to this day…' : 'Write the first line of this day…'} disabled={busy} />
-            <button className="btn primary sm" disabled={busy || !capture.trim()}>{busy ? '…' : 'Add'}</button>
+            <button type="submit" className="btn primary sm" disabled={busy || !capture.trim()}>{busy ? 'Adding…' : 'Add'}</button>
           </form>
           {data.note
             ? <div className="today-note"><NoteView ref={view} id={data.note.id} embedded /></div>
             : <div className="today-empty">
-                <div className="big">📝</div>
-                <h3>Nothing written {isToday ? 'today' : 'on this day'} yet</h3>
-                <p className="muted">“{data.title}” is made from your daily template in your daily folder.</p>
-                <button className="btn primary" onClick={startNote}>Start {isToday ? "today's" : 'this'} note</button>
+                <Empty icon="note" title={`Nothing written ${isToday ? 'today' : 'on this day'} yet`}>“{data.title}” is made from your daily template in your daily folder.</Empty>
+                <button type="button" className="btn primary" onClick={startNote}><Icon name="plus" size={15} />Start {isToday ? "today's" : 'this'} note</button>
               </div>}
         </section>
 
         <aside className="today-side">
           <section className="tcard">
-            <div className="tcard-head"><h3>Calendar</h3>{agenda?.url && <a href={agenda.url} target="_blank" rel="noreferrer" className="small">Open ↗</a>}</div>
+            <div className="tcard-head"><h3><Icon name="calendar" size={15} />Calendar</h3>{agenda?.url && <a href={agenda.url} target="_blank" rel="noreferrer" className="small">Open<Icon name="external" size={12} /></a>}</div>
             {!agenda ? <div className="muted small">Looking…</div>
-              : !agenda.connected ? <p className="muted small">Connect Nextcloud in <Link to="/settings?tab=integrations">Integrations</Link> to see your calendar here.</p>
+              : !agenda.connected ? <p className="muted small">Connect Nextcloud in <Link to="/settings/integrations">Integrations</Link> to see your calendar here.</p>
               : agenda.error ? <p className="muted small">{agenda.error}</p>
               : agenda.events.length === 0 ? <p className="muted small">Nothing in the calendar.</p>
               : <ul className="agenda">{agenda.events.map((e, i) => {
@@ -197,18 +196,18 @@ export default function Today() {
           </section>
 
           {habits && habits.connected && <section className="tcard">
-            <div className="tcard-head"><h3>Habits</h3>{habits.day && <span className="small muted">{habits.day.done}/{habits.day.total}</span>}{habits.url && <a href={habits.url} target="_blank" rel="noreferrer" className="small">Open ↗</a>}</div>
+            <div className="tcard-head"><h3><Icon name="habit" size={15} />Habits</h3>{habits.day && <span className="badge">{habits.day.done}/{habits.day.total}</span>}{habits.url && <a href={habits.url} target="_blank" rel="noreferrer" className="small">Open<Icon name="external" size={12} /></a>}</div>
             {habits.error ? <p className="muted small">{habits.error}</p>
               : habits.day && habits.day.habits.filter(h => h.scheduled).length === 0 ? <p className="muted small">No habits on this day.</p>
               : habits.day && <div className="habit-chips">{habits.day.habits.filter(h => h.scheduled).map(h => (
-                  <button key={h.id} className={`habit ${h.status === 1 ? 'done' : h.status === -1 ? 'missed' : ''}`} style={{ ['--hc' as string]: h.color || 'var(--accent)' }} onClick={() => setHabit(h)} disabled={date > todayISO()} title={h.streak ? `${h.streak}-day streak` : ''}>
-                    <span className="tick">{h.status === 1 ? '✓' : h.status === -1 ? '✕' : ''}</span>{h.name}{h.streak > 1 && <small>🔥{h.streak}</small>}
+                  <button type="button" key={h.id} className={`habit ${h.status === 1 ? 'done' : h.status === -1 ? 'missed' : ''}`} style={{ ['--hc' as string]: h.color || 'var(--accent)' }} onClick={() => setHabit(h)} disabled={date > todayISO()} title={h.streak ? `${h.streak}-day streak` : ''}>
+                    <span className="tick">{h.status === 1 ? <Icon name="check" size={13} strokeWidth={2.6} /> : h.status === -1 ? <Icon name="x" size={12} strokeWidth={2.6} /> : null}</span>{h.name}{h.streak > 1 && <small><Icon name="flame" size={12} />{h.streak}</small>}
                   </button>
                 ))}</div>}
           </section>}
 
           <section className="tcard">
-            <div className="tcard-head"><h3>Tasks</h3><Link to="/tasks" className="small">{data.tasks.open} open ›</Link></div>
+            <div className="tcard-head"><h3><Icon name="check-square" size={15} />Tasks</h3><Link to="/tasks" className="small">{data.tasks.open} open<Icon name="chevron-right" size={12} /></Link></div>
             {tasksDue === 0 && data.tasks.upcoming.length === 0 ? <p className="muted small">Nothing due. Give a task a date with 📅 {date} or due:{date}.</p> : <>
               <TaskGroup title="Overdue" kind="overdue" items={data.tasks.overdue} onToggle={toggleTask} />
               <TaskGroup title={isToday ? 'Today' : 'This day'} kind="today" items={data.tasks.today} onToggle={toggleTask} />
@@ -217,24 +216,24 @@ export default function Today() {
           </section>
 
           <section className="tcard">
-            <div className="tcard-head"><h3>Written {isToday ? 'today' : 'that day'}</h3></div>
+            <div className="tcard-head"><h3><Icon name="edit" size={15} />Written {isToday ? 'today' : 'that day'}</h3></div>
             {data.edited.length === 0 ? <p className="muted small">No other notes changed.</p> : <NoteList items={data.edited} onOpen={id => navigate(`/note/${id}`)} />}
           </section>
 
           {data.on_this_day.length > 0 && <section className="tcard">
-            <div className="tcard-head"><h3>On this day</h3></div>
+            <div className="tcard-head"><h3><Icon name="history" size={15} />On this day</h3></div>
             <ul className="mini-list">{data.on_this_day.map(p => (
-              <li key={p.date}><button className="link-btn mini" onClick={() => go(p.date)}><small className="muted">{p.label}</small><b>{p.note.title}</b><span className="muted small clamp">{p.note.excerpt || 'Empty note'}</span></button></li>
+              <li key={p.date}><button type="button" className="link-btn mini" onClick={() => go(p.date)}><small className="muted">{p.label}</small><b>{p.note.title}</b><span className="muted small clamp">{p.note.excerpt || 'Empty note'}</span></button></li>
             ))}</ul>
           </section>}
 
           {data.recent.length > 0 && <section className="tcard">
-            <div className="tcard-head"><h3>Recently opened</h3></div>
+            <div className="tcard-head"><h3><Icon name="clock" size={15} />Recently opened</h3></div>
             <NoteList items={data.recent.slice(0, 5)} onOpen={id => navigate(`/note/${id}`)} />
           </section>}
         </aside>
       </div>}
-    </div>
+    </div></div>
   )
 }
 
@@ -256,7 +255,7 @@ function TaskGroup({ title, kind, items, onToggle }: { title: string; kind: stri
 function NoteList({ items, onOpen }: { items: ShortNote[]; onOpen: (id: number) => void }) {
   return (
     <ul className="mini-list">{items.map(n => (
-      <li key={n.id}><button className="link-btn mini" onClick={() => onOpen(n.id)}>
+      <li key={n.id}><button type="button" className="link-btn mini" onClick={() => onOpen(n.id)}>
         <b>{n.title}{n.new && <span className="new-pill">new</span>}</b>
         <span className="muted small">{[n.category, ago(n.modified)].filter(Boolean).join(' · ')}</span>
       </button></li>

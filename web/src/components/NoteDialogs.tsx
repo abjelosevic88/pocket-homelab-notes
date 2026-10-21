@@ -5,6 +5,7 @@ import type { DiffOp, Note, Share, Version } from '../lib/types'
 import { ago, stamp } from '../lib/format'
 import { copyText } from '../lib/clipboard'
 import { Confirm, Loading, Modal, Segmented, useToast } from './ui'
+import { Icon } from './icons'
 
 const SOURCES: Record<string, string> = { web: 'Here', api: 'API', 'nextcloud-api': 'Nextcloud Notes app', sync: 'Changed in the folder', restore: 'Restored', import: 'First seen', capture: 'Quick capture', daily: 'Daily note', app: 'Pocket Homelab app', shortcut: 'Shortcut' }
 
@@ -26,7 +27,7 @@ export function HistoryModal({ note, onClose, onRestored }: { note: Note; onClos
         <div className="history">
           <ul className="history-list">
             {list.map((v, i) => (
-              <li key={v.id}><button className={sel === v.id ? 'active' : ''} onClick={() => setSel(v.id)}>
+              <li key={v.id}><button type="button" className={sel === v.id ? 'active' : ''} onClick={() => setSel(v.id)}>
                 <b>{i === 0 ? 'Current' : ago(v.created_at)}</b>
                 <small className="muted">{stamp(v.created_at)} · {SOURCES[v.source] || v.source}</small>
                 {v.title !== note.title && <small className="muted">as “{v.title}”</small>}
@@ -39,7 +40,7 @@ export function HistoryModal({ note, onClose, onRestored }: { note: Note; onClos
                 <Segmented size="sm" value={show} onChange={setShow} options={[{ value: 'diff', label: 'Changes since' }, { value: 'text', label: 'This version' }]} />
                 <span className="muted small">since then: {view.added} line{view.added === 1 ? '' : 's'} added, {view.removed} removed</span>
                 <span className="spacer" />
-                {list[0]?.id !== sel && <button className="btn primary sm" onClick={() => setConfirm(true)}>Restore this version</button>}
+                {list[0]?.id !== sel && <button type="button" className="btn primary sm" onClick={() => setConfirm(true)}><Icon name="undo" size={14} />Restore this version</button>}
               </div>
               {show === 'diff'
                 ? <pre className="diff">{view.diff.length ? view.diff.map((o, i) => <div key={i} className={`d ${o.kind === '+' ? 'add' : o.kind === '-' ? 'del' : o.kind === '…' ? 'gap' : ''}`}>{o.kind === '…' ? '⋯' : `${o.kind === '=' ? ' ' : o.kind} ${o.text}`}</div>) : <span className="muted">Same as now.</span>}</pre>
@@ -70,7 +71,7 @@ export function ShareModal({ note, onClose }: { note: Note; onClose: () => void 
       <p className="muted">Anyone with the link can read this note (and see the pictures in it) without an account. They cannot change it. Revoke a link to close it.</p>
       <div className="row wrap mb">
         <Segmented size="sm" value={days} onChange={setDays} options={[{ value: 0, label: 'No end' }, { value: 1, label: '1 day' }, { value: 7, label: '7 days' }, { value: 30, label: '30 days' }]} />
-        <button className="btn primary" onClick={make}>Make a link</button>
+        <button type="button" className="btn primary" onClick={make}><Icon name="link" size={15} />Make a link</button>
       </div>
       {!list ? <Loading /> : list.length === 0 ? <p className="muted small">No links to this note yet.</p> : (
         <table className="table compact">
@@ -78,9 +79,9 @@ export function ShareModal({ note, onClose }: { note: Note; onClose: () => void 
             <tr key={s.id}>
               <td><code className="mono small">{url(s)}</code><div className="muted small">{s.views} view{s.views === 1 ? '' : 's'} · {s.expires_at ? `until ${stamp(s.expires_at)}` : 'no end'}</div></td>
               <td className="right"><span className="row" style={{ justifyContent: 'flex-end' }}>
-                <button className="btn ghost sm" onClick={async () => { const ok = await copyText(url(s)); toast(ok ? 'Copied' : 'Could not copy — select the link instead', ok ? 'ok' : 'err') }}>Copy</button>
+                <button type="button" className="btn ghost sm" onClick={async () => { const ok = await copyText(url(s)); toast(ok ? 'Copied' : 'Could not copy — select the link instead', ok ? 'ok' : 'err') }}>Copy</button>
                 <a className="btn ghost sm" href={url(s)} target="_blank" rel="noreferrer">Open</a>
-                <button className="btn ghost sm danger-text" onClick={async () => { await api.del(`${V1}/shares/${s.id}`); load() }}>Revoke</button>
+                <button type="button" className="btn ghost sm danger-text" onClick={async () => { await api.del(`${V1}/shares/${s.id}`); load() }}>Revoke</button>
               </span></td>
             </tr>
           ))}</tbody>
@@ -98,12 +99,12 @@ export function MoveModal({ current, onMove, onClose }: { current: string; onMov
   const fresh = q.trim() && !paths.some(p => p.toLowerCase() === q.trim().toLowerCase())
   return (
     <Modal title="Move to" onClose={onClose}>
-      <input autoFocus value={q} onChange={e => setQ(e.target.value)} placeholder="Find or name a folder (Projects/Athena)…" className="mb" style={{ width: '100%' }} />
+      <div className="tool-search"><Icon name="search" size={15} /><input autoFocus value={q} onChange={e => setQ(e.target.value)} placeholder="Find or name a folder (Projects/Athena)…" aria-label="Folder" /></div>
       <div className="tool-results">
-        {fresh && <button className="tool-row" onClick={() => onMove(q.trim())}><span className="ico">＋</span><span className="grow"><b>New folder “{q.trim()}”</b></span></button>}
+        {fresh && <button type="button" className="tool-row" onClick={() => onMove(q.trim())}><span className="ico"><Icon name="folder-plus" size={16} /></span><span className="grow"><b>New folder “{q.trim()}”</b></span></button>}
         {shown.map(p => (
-          <button key={p || '/'} className={`tool-row ${p === current ? 'active' : ''}`} disabled={p === current} onClick={() => onMove(p)}>
-            <span className="ico">📁</span><span className="grow" style={{ paddingLeft: (p.split('/').length - 1) * 14 }}><b>{p ? p.split('/').pop() : 'Notes (top level)'}</b>{p.includes('/') && <small className="muted">{p}</small>}</span>
+          <button type="button" key={p || '/'} className={`tool-row ${p === current ? 'active' : ''}`} disabled={p === current} onClick={() => onMove(p)}>
+            <span className="ico"><Icon name={p === current ? 'folder-open' : 'folder'} size={16} /></span><span className="grow" style={{ paddingLeft: (p.split('/').length - 1) * 14 }}><b>{p ? p.split('/').pop() : 'Notes (top level)'}</b>{p.includes('/') && <small className="muted">{p}</small>}</span>
           </button>
         ))}
       </div>

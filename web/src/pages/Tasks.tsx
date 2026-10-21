@@ -4,6 +4,7 @@ import { api, V1 } from '../lib/api'
 import type { TaskLine } from '../lib/types'
 import { today } from '../lib/format'
 import { Empty, Loading, PageHeader, Segmented, useAsync, useToast } from '../components/ui'
+import { Icon } from '../components/icons'
 
 // Every checkbox in every note, by when it is due; ticking one writes the note.
 export default function Tasks() {
@@ -31,26 +32,26 @@ export default function Tasks() {
     } catch (e) { toast((e as Error).message, 'err') }
   }
   return (
-    <div className="page">
+    <div className="page"><div className="page-inner">
       <PageHeader title="Tasks" sub="Every checkbox in your notes. Give one a date with 📅 2026-10-21 or due:2026-10-21." actions={<Segmented size="sm" value={state} onChange={setState} options={[{ value: 'open', label: 'Open' }, { value: 'done', label: 'Done' }, { value: 'all', label: 'All' }]} />} />
-      <input className="mb" value={q} onChange={e => setQ(e.target.value)} placeholder="Filter…" style={{ maxWidth: 360 }} />
+      <div className="tool-search task-filter"><Icon name="search" size={15} /><input value={q} onChange={e => setQ(e.target.value)} placeholder="Filter tasks…" aria-label="Filter tasks" /></div>
       {loading && !data && <Loading />}
-      {error && <div className="callout danger">{error}</div>}
-      {data && !groups.length && <Empty title={state === 'open' ? 'Nothing to do' : 'No tasks'}>Write <code>- [ ] something</code> in any note.</Empty>}
+      {error && <div className="callout danger"><Icon name="alert" size={15} /><span>{error}</span></div>}
+      {data && !groups.length && <Empty icon="check-square" title={state === 'open' ? 'Nothing to do' : 'No tasks'}>Write <code>- [ ] something</code> in any note.</Empty>}
       {groups.map(g => (
         <section key={g.key} className={`task-group ${g.key}`}>
-          <h3>{g.title} <small className="muted">{g.items.length}</small></h3>
+          <h3>{g.title}<span className={`badge ${g.key === 'overdue' ? 'danger' : ''}`}>{g.items.length}</span></h3>
           <ul className="task-list">
             {g.items.map((t, i) => (
               <li key={`${t.note_id}-${t.line}-${i}`} style={{ paddingLeft: 8 + t.indent * 10 }} className={t.done ? 'done' : ''}>
                 <input type="checkbox" checked={t.done} onChange={() => toggle(t)} />
                 <span className="grow">{t.text.replace(/(📅\s*|due:\s*)\d{4}-\d{2}-\d{2}/, '').replace(/\[([^\]]*)\]\([^)]*\)/g, '$1').replace(/[*_~`]+/g, '').trim()}{t.due && <span className={`due ${g.key}`}>{t.due}</span>}</span>
-                <Link to={`/note/${t.note_id}`} className="muted small">{t.title}</Link>
+                <Link to={`/note/${t.note_id}`} title={t.category ? `${t.category}/${t.title}` : t.title}><Icon name="note" size={13} />{t.title}</Link>
               </li>
             ))}
           </ul>
         </section>
       ))}
-    </div>
+    </div></div>
   )
 }

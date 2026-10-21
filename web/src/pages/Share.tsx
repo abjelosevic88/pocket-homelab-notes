@@ -28,13 +28,13 @@ export default function Share() {
       window.open(`/api/public/share/${encodeURIComponent(token)}/attachment?path=${encodeURIComponent(path)}`, '_blank', 'noopener')
     }
   }
-  if (err) return <div className="share-page"><div className="callout danger">{err}</div></div>
+  if (err) return <div className="share-page"><div className="callout danger"><span>{err}</span></div></div>
   if (!note) return <div className="share-page"><Loading /></div>
   return (
     <div className="share-page">
-      <header className="share-head"><h1>{note.title}</h1><p className="muted small">{note.author && <>Shared by {note.author} · </>}edited {stamp(note.modified)}</p></header>
+      <header className="share-head"><div className="grow"><h1>{note.title}</h1><p className="muted small">{note.author && <>Shared by {note.author} · </>}edited {stamp(note.modified)}</p></div></header>
       <div className="share-body"><RichEditor ref={ed} docKey={token} revision={1} content={note.content} share={token} readonly theme={theme} onMessage={onMessage} /></div>
-      <footer className="muted small center">Pocket Notes</footer>
+      <footer className="share-foot"><img src="/favicon.svg" alt="" />Pocket Notes</footer>
     </div>
   )
 }

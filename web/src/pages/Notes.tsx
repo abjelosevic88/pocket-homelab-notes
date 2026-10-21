@@ -4,7 +4,9 @@ import { api, V1, qs } from '../lib/api'
 import { useApp } from '../lib/app-context'
 import type { Note, SearchHit } from '../lib/types'
 import { ago, leaf, snippetParts, stamp } from '../lib/format'
-import { Empty, Loading, useDebounce, useToast } from '../components/ui'
+import { Empty, Loading, Switch, useDebounce, useToast } from '../components/ui'
+import { Icon } from '../components/icons'
+import { Select } from '../components/Select'
 import NoteView from '../components/NoteView'
 import { newNoteIn } from '../components/Layout'
 import { NoteMenu } from '../components/NoteMenu'
@@ -70,21 +72,20 @@ export default function Notes() {
       <section className="note-list">
         <div className="list-head">
           <div className="row">
-            <h2 className="grow" title={folder || undefined}>{heading}</h2>
-            <button className="btn primary sm" onClick={() => newNoteIn(folder ?? settings?.default_folder ?? '', navigate, bump, toast)} title="New note here">＋</button>
+            <div className="tool-search grow" title={folder || undefined}><Icon name="search" size={15} /><input value={q} onChange={e => search(e.target.value)} placeholder={folder || tag ? `Search in ${heading}…` : 'Search all notes…'} aria-label="Search notes" />{q && <button type="button" className="btn ghost icon-only xs" onClick={() => search('')} aria-label="Clear the search"><Icon name="x" size={14} /></button>}</div>
+            <button type="button" className="btn primary icon-only list-new" onClick={() => newNoteIn(folder ?? settings?.default_folder ?? '', navigate, bump, toast)} title={folder ? `New note in ${heading}` : 'New note'} aria-label="New note here"><Icon name="plus" size={17} strokeWidth={2.2} /></button>
           </div>
-          <div className="tool-search sm"><span className="muted">⌕</span><input value={q} onChange={e => search(e.target.value)} placeholder={folder || tag ? `Search in ${heading}…` : 'Search all notes…'} />{q && <button className="btn ghost xs" onClick={() => search('')}>✕</button>}</div>
-          <div className="row small muted list-opts">
+          <div className="row list-opts">
             <span>{notes ? `${notes.length} note${notes.length === 1 ? '' : 's'}` : ''}</span>
             <span className="spacer" />
-            {folder && <label className="row"><input type="checkbox" checked={sub} onChange={e => setSub(e.target.checked)} /> subfolders</label>}
-            {!q.trim() && view !== 'recent' && <select className="xs" value={sort} onChange={e => setSort(e.target.value)} aria-label="Sort"><option value="modified">Edited</option><option value="created">Created</option><option value="title">Title</option></select>}
+            {folder && <label className="check-row" title="Show notes in folders inside this one"><Switch size="sm" checked={sub} onChange={setSub} label="Subfolders" />Subfolders</label>}
+            {!q.trim() && view !== 'recent' && <Select size="sm" className="ghost inline" label="Sort" value={sort} onChange={v => setSort(v)} width={160} options={[{ value: 'modified', label: 'Edited' }, { value: 'created', label: 'Created' }, { value: 'title', label: 'Title' }]} />}
           </div>
         </div>
         <div className="list-scroll">
-          {err && <div className="callout danger m">{err}</div>}
+          {err && <div className="callout danger m"><Icon name="alert" size={15} /><span>{err}</span></div>}
           {!notes && !err && <Loading />}
-          {notes && notes.length === 0 && <Empty title={q ? 'Nothing found' : 'No notes here yet'}>{q ? 'Try fewer words, or tag:, in:, is:fav, has:tasks.' : 'Make one with ＋ or press Alt+N.'}</Empty>}
+          {notes && notes.length === 0 && <Empty icon={q ? 'search' : 'note'} title={q ? 'Nothing found' : 'No notes here yet'}>{q ? 'Try fewer words, or tag:, in:, is:fav, has:tasks.' : <>Make one with <b>New note</b> or press <kbd>N</kbd>.</>}</Empty>}
           {pinned.length > 0 && <div className="list-group">Pinned</div>}
           {pinned.map(n => <Row key={n.id} n={n} active={n.id === selected} menu={menu?.note.id === n.id} onMenu={onMenu} params={params} showFolder={folder == null} />)}
           {pinned.length > 0 && rest.length > 0 && <div className="list-group">Notes</div>}
@@ -105,14 +106,14 @@ function Row({ n, active, menu, onMenu, params, showFolder }: { n: Note | Search
     <Link to={`/note/${n.id}${params.toString() ? '?' + params.toString() : ''}`} className={`note-row ${active ? 'active' : ''} ${menu ? 'menu-on' : ''}`} onContextMenu={e => onMenu(n, e)}>
       <div className="row">
         <b className="grow ellipsis">{n.title || 'Untitled'}</b>
-        {n.favorite && <span className="star" title="Favourite">★</span>}
-        {n.pinned && <span title="Pinned">📌</span>}
+        {n.pinned && <Icon name="pushpin" size={13} title="Pinned" />}
+        {n.favorite && <Icon name="star" size={13} className="star" title="Favourite" />}
       </div>
       <div className="excerpt">{snippet ? snippetParts(snippet).map((p, i) => p.hit ? <mark key={i}>{p.text}</mark> : <span key={i}>{p.text}</span>) : n.excerpt || <span className="muted">Empty note</span>}</div>
       <div className="row meta small muted">
         <span title={stamp(n.modified)}>{ago(n.modified)}</span>
         {showFolder && n.category && <span className="folder-chip">{leaf(n.category)}</span>}
-        {n.tasks_open > 0 && <span title="Open tasks">☐ {n.tasks_open}</span>}
+        {n.tasks_open > 0 && <span title="Open tasks"><Icon name="square" size={11} />{n.tasks_open}</span>}
         {n.tags.slice(0, 3).map(t => <span key={t} className="tag-chip">#{t}</span>)}
       </div>
     </Link>
@@ -125,12 +126,16 @@ function Welcome() {
   useEffect(() => { api.get<{ notes: number; edited_today: number; open_tasks: number; due_tasks: number }>(`${V1}/dashboard`).then(setD).catch(() => {}) }, [])
   return (
     <div className="welcome">
-      <img src="/favicon.svg" alt="" width={72} height={72} />
+      <img src="/favicon.svg" alt="" width={64} height={64} />
       <h2>Pocket Notes</h2>
-      {d && <p className="muted">{d.notes} notes · {d.edited_today} edited today · {d.open_tasks} open tasks{d.due_tasks ? <> · <Link to="/tasks">{d.due_tasks} due</Link></> : null}</p>}
       {sync?.where && <p className="muted small">Kept in {sync.where}</p>}
-      <div className="kbd-help small muted">
-        <span><kbd>⌘K</kbd> find</span><span><kbd>Alt N</kbd> new note</span><span><kbd>⌘⇧D</kbd> today</span><span><kbd>/</kbd> in a note: blocks & homelab tools</span><span><kbd>[[</kbd> link a note</span>
+      {d && <div className="welcome-stats">
+        <div className="welcome-stat"><b>{d.notes}</b><span>notes</span></div>
+        <div className="welcome-stat"><b>{d.edited_today}</b><span>edited today</span></div>
+        <Link className="welcome-stat" to="/tasks"><b>{d.open_tasks}</b><span>open tasks{d.due_tasks ? ` · ${d.due_tasks} due` : ''}</span></Link>
+      </div>}
+      <div className="kbd-help">
+        <span><kbd>⌘K</kbd> find</span><span><kbd>N</kbd> new note</span><span><kbd>T</kbd> today</span><span><kbd>/</kbd> in a note: blocks & homelab tools</span><span><kbd>[[</kbd> link a note</span><span><kbd>?</kbd> all shortcuts</span>
       </div>
     </div>
   )

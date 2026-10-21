@@ -1,10 +1,10 @@
-import { useEffect, useLayoutEffect, useRef, useState } from 'react'
+import { useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { api, V1 } from '../lib/api'
 import { useApp } from '../lib/app-context'
 import type { Note } from '../lib/types'
 import { copyText } from '../lib/clipboard'
-import { Confirm, Field, Modal, useToast } from './ui'
+import { Confirm, Field, Menu, type MenuItem, Modal, useToast } from './ui'
 import { MoveModal, ShareModal } from './NoteDialogs'
 import { noteURL } from './NoteView'
 
@@ -31,27 +31,10 @@ export function NoteMenu({ note, x, y, onClose }: { note: Note; x: number; y: nu
   const { bump, settings } = useApp()
   const { toast } = useToast()
   const navigate = useNavigate()
-  const box = useRef<HTMLDivElement>(null)
-  const [pos, setPos] = useState({ left: x, top: y })
-  const [sheet, setSheet] = useState<'' | 'rename' | 'move' | 'share' | 'delete'>('')
+  const [sheet, setSheetRaw] = useState<'' | 'rename' | 'move' | 'share' | 'delete'>('')
+  const sheetRef = useRef<typeof sheet>('')
+  const setSheet = (k: typeof sheet) => { sheetRef.current = k; setSheetRaw(k) }
   const [title, setTitle] = useState(note.title)
-
-  // Kept inside the window: flipped up or left when it would run off an edge.
-  useLayoutEffect(() => {
-    const r = box.current?.getBoundingClientRect()
-    if (!r) return
-    setPos({ left: Math.max(8, x + r.width > innerWidth - 8 ? x - r.width : x), top: Math.max(8, y + r.height > innerHeight - 8 ? y - r.height : y) })
-  }, [x, y])
-
-  // Escape, a scroll of the list or a resize closes it, as a menu of the system would.
-  useEffect(() => {
-    if (sheet) return
-    const key = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose() }
-    window.addEventListener('keydown', key)
-    window.addEventListener('resize', onClose)
-    window.addEventListener('scroll', onClose, true)
-    return () => { window.removeEventListener('keydown', key); window.removeEventListener('resize', onClose); window.removeEventListener('scroll', onClose, true) }
-  }, [sheet, onClose])
 
   const run = async (action: NoteAction, done?: string) => {
     onClose()
@@ -71,36 +54,34 @@ export function NoteMenu({ note, x, y, onClose }: { note: Note; x: number; y: nu
     } catch (e) { toast((e as Error).message, 'err') }
   }
   const open = (path: string) => { onClose(); navigate(`${path}${location.search}`) }
-  const item = (label: string, fn: () => void, cls = '') => <button className={cls} onClick={fn}>{label}</button>
+  const items: MenuItem[] = [
+    { label: 'Open', icon: 'note', onSelect: () => open(`/note/${note.id}`) },
+    { label: 'Open in a new tab', icon: 'external', onSelect: () => window.open(`/note/${note.id}`, '_blank') },
+    'sep',
+    { label: note.favorite ? 'Remove from favourites' : 'Favourite', icon: 'star', onSelect: () => run({ kind: 'patch', body: { favorite: !note.favorite } }) },
+    { label: note.pinned ? 'Unpin' : 'Pin to the top', icon: 'pushpin', onSelect: () => run({ kind: 'patch', body: { pinned: !note.pinned } }) },
+    { label: 'Rename…', icon: 'edit', onSelect: () => setSheet('rename') },
+    { label: 'Move to…', icon: 'move', onSelect: () => setSheet('move') },
+    { label: 'Duplicate', icon: 'copy', onSelect: async () => {
+      onClose()
+      try { const n = await api.post<Note>(`${V1}/notes/${note.id}/duplicate`); bump(); navigate(`/note/${n.id}${location.search}`) } catch (e) { toast((e as Error).message, 'err') }
+    } },
+    { label: 'Share a link…', icon: 'share', onSelect: () => setSheet('share') },
+    'sep',
+    { label: 'Copy link', icon: 'link', onSelect: async () => { onClose(); const ok = await copyText(noteURL(note.id)); toast(ok ? 'Link copied' : 'Could not copy the link', ok ? 'ok' : 'err') } },
+    { label: 'Download .md', icon: 'download', onSelect: () => { onClose(); location.href = `${V1}/notes/${note.id}/download` } },
+    'sep',
+    { label: 'Delete…', icon: 'trash', danger: true, onSelect: () => setSheet('delete') },
+  ]
 
   return (
     <>
-      {!sheet && <>
-        <div className="ctx-scrim" onMouseDown={onClose} onContextMenu={e => { e.preventDefault(); onClose() }} />
-        <div ref={box} className="ctx-menu" style={pos} role="menu">
-          {item('Open', () => open(`/note/${note.id}`))}
-          {item('Open in a new tab', () => { onClose(); window.open(`/note/${note.id}`, '_blank') })}
-          <hr />
-          {item(note.favorite ? 'Remove from favourites' : 'Favourite', () => run({ kind: 'patch', body: { favorite: !note.favorite } }))}
-          {item(note.pinned ? 'Unpin' : 'Pin to the top', () => run({ kind: 'patch', body: { pinned: !note.pinned } }))}
-          {item('Rename…', () => setSheet('rename'))}
-          {item('Move to…', () => setSheet('move'))}
-          {item('Duplicate', async () => {
-            onClose()
-            try { const n = await api.post<Note>(`${V1}/notes/${note.id}/duplicate`); bump(); navigate(`/note/${n.id}${location.search}`) } catch (e) { toast((e as Error).message, 'err') }
-          })}
-          {item('Share a link…', () => setSheet('share'))}
-          <hr />
-          {item('Copy link', async () => { onClose(); const ok = await copyText(noteURL(note.id)); toast(ok ? 'Link copied' : 'Could not copy the link', ok ? 'ok' : 'err') })}
-          {item('Download .md', () => { onClose(); location.href = `${V1}/notes/${note.id}/download` })}
-          <hr />
-          {item('Delete…', () => setSheet('delete'), 'danger-text')}
-        </div>
-      </>}
-      {sheet === 'rename' && <Modal title="Rename" onClose={onClose}>
-        <form className="grid" style={{ gap: 14 }} onSubmit={e => { e.preventDefault(); const t = title.trim(); if (t && t !== note.title) run({ kind: 'rename', title: t }, 'Renamed'); else onClose() }}>
+      {/* The menu closes before its item runs: an item that opens a dialog keeps this alive for it. */}
+      {!sheet && <Menu anchor={{ x, y, w: 0, h: 0 }} items={items} onClose={() => setTimeout(() => { if (!sheetRef.current) onClose() }, 0)} width={220} />}
+      {sheet === 'rename' && <Modal title="Rename" onClose={onClose} size="sm">
+        <form className="stack" onSubmit={e => { e.preventDefault(); const t = title.trim(); if (t && t !== note.title) run({ kind: 'rename', title: t }, 'Renamed'); else onClose() }}>
           <Field label="Title"><input autoFocus value={title} onChange={e => setTitle(e.target.value)} onFocus={e => e.target.select()} /></Field>
-          <div className="form-actions"><button type="button" className="btn" onClick={onClose}>Cancel</button><button className="btn primary">Rename</button></div>
+          <div className="form-actions"><button type="button" className="btn" onClick={onClose}>Cancel</button><button type="submit" className="btn primary">Rename</button></div>
         </form>
       </Modal>}
       {sheet === 'move' && <MoveModal current={note.category} onClose={onClose} onMove={cat => run({ kind: 'patch', body: { category: cat }, msg: `Moved to ${cat || 'Notes'}` }, `Moved to ${cat || 'Notes'}`)} />}

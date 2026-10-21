@@ -4,7 +4,8 @@ import { api, ApiError, upload, V1, qs } from '../lib/api'
 import { useApp } from '../lib/app-context'
 import type { Note, Person } from '../lib/types'
 import { ago, headings, stamp, wordCount, leaf } from '../lib/format'
-import { Confirm, Loading, useToast } from './ui'
+import { Confirm, Loading, type MenuItem, MenuButton, Segmented, useToast } from './ui'
+import { Icon } from './icons'
 import { RichEditor, type EditorMessage, type RichEditorHandle } from './RichEditor'
 import { MarkdownEditor, type MarkdownEditorHandle } from './MarkdownEditor'
 import { BookmarkSheet, DiagramViewer, ExpenseSheet, FilesPicker, HabitsSheet, LinkPicker, PhotoPicker, TaskSheet, TemplatePicker, VoiceMemo, toolError } from './Tools'
@@ -44,10 +45,9 @@ const NoteView = forwardRef<NoteViewHandle, { id: number; onBack?: () => void; e
   const [conflict, setConflict] = useState<Note | null>(null)
   const [mode, setMode] = useState<'rich' | 'markdown'>(() => (localStorage.getItem('pn-mode') as 'rich' | 'markdown') || settings?.editor || 'rich')
   // On a phone the panel covers the note, so it is never open on arrival there.
-  const [panel, setPanel] = useState<'' | 'outline' | 'links' | 'info'>(() => isPhone() ? '' : (localStorage.getItem('pn-panel') as '' | 'outline' | 'links' | 'info') || '')
+  const [panel, setPanel] = useState<'' | 'outline' | 'links' | 'info'>(() => phone() ? '' : (localStorage.getItem('pn-panel') as '' | 'outline' | 'links' | 'info') || '')
   const [sheet, setSheet] = useState<Sheet | null>(null)
   const [title, setTitle] = useState('')
-  const [menu, setMenu] = useState(false)
   const rich = useRef<RichEditorHandle>(null)
   const md = useRef<MarkdownEditorHandle>(null)
   const fileInput = useRef<HTMLInputElement>(null)
@@ -57,7 +57,7 @@ const NoteView = forwardRef<NoteViewHandle, { id: number; onBack?: () => void; e
   const cur = useRef<{ id: number; etag: string; saved: string; draft: string; saving: boolean; again: boolean; timer: number }>({ id: 0, etag: '', saved: '', draft: '', saving: false, again: false, timer: 0 })
 
   useEffect(() => { localStorage.setItem('pn-mode', mode) }, [mode])
-  useEffect(() => { if (!isPhone()) localStorage.setItem('pn-panel', panel) }, [panel])
+  useEffect(() => { if (!phone()) localStorage.setItem('pn-panel', panel) }, [panel])
 
   const save = useCallback(async (): Promise<void> => {
     const c = cur.current
@@ -114,7 +114,7 @@ const NoteView = forwardRef<NoteViewHandle, { id: number; onBack?: () => void; e
     }
     window.clearTimeout(prev.timer)
     // The note on screen stays (and its editor with it) until the next one is here: no flash.
-    setErr(''); setConflict(null); setSheet(null); setMenu(false)
+    setErr(''); setConflict(null); setSheet(null)
     cur.current = { ...prev, id: 0, timer: 0 }
     api.get<Note>(`${V1}/notes/${id}`).then(n => {
       if (!live) return
@@ -394,8 +394,28 @@ const NoteView = forwardRef<NoteViewHandle, { id: number; onBack?: () => void; e
     } catch (e) { toast((e as Error).message, 'err') }
   }
 
-  if (err) return <div className="note-empty"><div className="callout danger">{err}</div>{onBack && <button className="btn mt" onClick={onBack}>← Back</button>}</div>
+  if (err) return <div className="note-empty"><div className="callout danger"><Icon name="alert" size={15} /><span>{err}</span></div>{onBack && <button type="button" className="btn mt" onClick={onBack}><Icon name="chevron-left" size={16} />Back</button>}</div>
   if (!note) return <div className="note-empty"><Loading /></div>
+
+  const menuItems = (): MenuItem[] => [
+    ...(phone() ? [
+      { label: note.favorite ? 'Remove from favourites' : 'Favourite', icon: 'star', onSelect: () => patch({ favorite: !note.favorite }) },
+      { label: note.pinned ? 'Unpin' : 'Pin to the top', icon: 'pushpin', onSelect: () => patch({ pinned: !note.pinned }) },
+      { label: 'Outline, links and info', icon: 'panel-right', onSelect: () => setPanel('outline') },
+      'sep' as const,
+    ] : []),
+    { label: 'History…', icon: 'history', onSelect: () => setSheet({ kind: 'history' }) },
+    { label: 'Share a link…', icon: 'share', onSelect: () => setSheet({ kind: 'share' }) },
+    { label: 'Move to…', icon: 'move', onSelect: () => setSheet({ kind: 'move' }) },
+    { label: 'Duplicate', icon: 'copy', onSelect: async () => { try { const n = await api.post<Note>(`${V1}/notes/${note.id}/duplicate`); bump(); navigate(`/note/${n.id}${location.search}`) } catch (e) { toast((e as Error).message, 'err') } } },
+    'sep',
+    { label: 'Copy link', icon: 'link', onSelect: async () => { const ok = await copyText(noteURL(note.id)); toast(ok ? 'Link copied' : 'Could not copy the link', ok ? 'ok' : 'err') } },
+    { label: 'Download .md', icon: 'download', onSelect: () => { location.href = `${V1}/notes/${note.id}/download` } },
+    { label: 'Print / PDF', icon: 'printer', onSelect: () => doExport('pdf') },
+    { label: 'Export HTML', icon: 'code', onSelect: () => doExport('html') },
+    'sep',
+    { label: 'Delete…', icon: 'trash', danger: true, onSelect: () => setSheet({ kind: 'delete' }) },
+  ]
 
   const outline = headings(draft)
   const words = wordCount(draft)
@@ -404,53 +424,35 @@ const NoteView = forwardRef<NoteViewHandle, { id: number; onBack?: () => void; e
   return (
     <div className={`note-view ${panel ? 'with-panel' : ''} ${embedded ? 'embedded' : ''}`}>
       <header className="note-head">
-        {onBack && <button className="btn ghost icon back-btn" onClick={onBack} aria-label="Back">←</button>}
+        {onBack && <button type="button" className="btn ghost icon-only back-btn" onClick={onBack} aria-label="Back to the list"><Icon name="chevron-left" size={20} /></button>}
         <div className="note-title-wrap">
-          <div className="crumbs small note-crumbs">
-            <Link to={`/?in=${encodeURIComponent(note.category)}`} className="muted">{note.category ? note.category.split('/').join(' › ') : 'Notes'}</Link>
+          <div className="note-crumbs">
+            <Link to={`/?in=${encodeURIComponent(note.category)}`}><Icon name="folder" size={12} />{note.category ? note.category.split('/').join(' › ') : 'Notes'}</Link>
           </div>
           <input className="note-title" value={title} onChange={e => setTitle(e.target.value)} onBlur={rename} onKeyDown={e => { if (e.key === 'Enter') { (e.target as HTMLInputElement).blur() } if (e.key === 'Escape') { setTitle(note.title); (e.target as HTMLInputElement).blur() } }} readOnly={note.readonly} aria-label="Title" />
         </div>
         <div className="note-actions">
           <span className={`save-state ${status}`} title={stamp(note.modified)}>{statusText[status]}</span>
-          <button className={`btn ghost icon wide-only ${note.favorite ? 'on star' : ''}`} title={note.favorite ? 'Remove from favourites' : 'Favourite'} onClick={() => patch({ favorite: !note.favorite })}>{note.favorite ? '★' : '☆'}</button>
-          <button className={`btn ghost icon wide-only ${note.pinned ? 'on' : ''}`} title={note.pinned ? 'Unpin' : 'Pin to the top'} onClick={() => patch({ pinned: !note.pinned })}>📌</button>
-          <div className="segmented sm mode-toggle">
-            <button className={mode === 'rich' ? 'active' : ''} onClick={() => { const p = rich.current?.flush(); if (p != null) changed(p); setMode('rich'); setRevision(r => r + 1) }} title="Rich text">Aa</button>
-            <button className={mode === 'markdown' ? 'active' : ''} onClick={() => { const p = rich.current?.flush(); if (p != null) changed(p); setMode('markdown'); setRevision(r => r + 1) }} title="Markdown source">M↓</button>
-          </div>
-          <button className={`btn ghost icon wide-only ${panel ? 'on' : ''}`} title="Outline, links and info" onClick={() => setPanel(p => p ? '' : 'outline')}>☰</button>
-          <div className="menu-wrap">
-            <button className="btn ghost icon" onClick={() => setMenu(o => !o)} aria-label="More">⋯</button>
-            {menu && <div className="menu" onMouseLeave={() => setMenu(false)} onClick={() => setMenu(false)}>
-              <button className="phone-only" onClick={() => patch({ favorite: !note.favorite })}>{note.favorite ? '★ Remove from favourites' : '☆ Favourite'}</button>
-              <button className="phone-only" onClick={() => patch({ pinned: !note.pinned })}>{note.pinned ? '📌 Unpin' : '📌 Pin to the top'}</button>
-              <button className="phone-only" onClick={() => setPanel('outline')}>☰ Outline, links and info</button>
-              <hr className="phone-only" />
-              <button onClick={() => setSheet({ kind: 'history' })}>History…</button>
-              <button onClick={() => setSheet({ kind: 'share' })}>Share a link…</button>
-              <button onClick={() => setSheet({ kind: 'move' })}>Move to…</button>
-              <button onClick={async () => { const n = await api.post<Note>(`${V1}/notes/${note.id}/duplicate`); bump(); navigate(`/note/${n.id}${location.search}`) }}>Duplicate</button>
-              <hr />
-              <button onClick={async () => { const ok = await copyText(noteURL(note.id)); toast(ok ? 'Link copied' : 'Could not copy the link', ok ? 'ok' : 'err') }}>Copy link</button>
-              <a href={`${V1}/notes/${note.id}/download`}>Download .md</a>
-              <button onClick={() => doExport('pdf')}>Print / PDF</button>
-              <button onClick={() => doExport('html')}>Export HTML</button>
-              <hr />
-              <button className="danger-text" onClick={() => setSheet({ kind: 'delete' })}>Delete</button>
-            </div>}
-          </div>
+          <button type="button" className={`btn ghost icon-only wide-only ${note.favorite ? 'on star' : ''}`} title={note.favorite ? 'Remove from favourites' : 'Favourite'} aria-label={note.favorite ? 'Remove from favourites' : 'Favourite'} aria-pressed={note.favorite} onClick={() => patch({ favorite: !note.favorite })}><Icon name="star" size={17} /></button>
+          <button type="button" className={`btn ghost icon-only wide-only ${note.pinned ? 'on' : ''}`} title={note.pinned ? 'Unpin' : 'Pin to the top'} aria-label={note.pinned ? 'Unpin' : 'Pin to the top'} aria-pressed={note.pinned} onClick={() => patch({ pinned: !note.pinned })}><Icon name="pushpin" size={17} /></button>
+          <Segmented size="sm" className="mode-toggle" label="Editor" value={mode} onChange={m => { const p = rich.current?.flush(); if (p != null) changed(p); setMode(m); setRevision(r => r + 1) }}
+            options={[{ value: 'rich' as const, label: 'Aa', title: 'Rich text' }, { value: 'markdown' as const, label: 'M↓', title: 'Markdown source' }]} />
+          <button type="button" className={`btn ghost icon-only wide-only ${panel ? 'on' : ''}`} title="Outline, links and info" aria-label="Outline, links and info" aria-pressed={!!panel} onClick={() => setPanel(p => p ? '' : 'outline')}><Icon name="panel-right" size={17} /></button>
+          <MenuButton label="More" align="right" width={220} items={menuItems}><Icon name="more" size={18} /></MenuButton>
         </div>
       </header>
 
       {note.tags.length > 0 && <div className="note-tags">{note.tags.map(t => <Link key={t} to={`/?tag=${encodeURIComponent(t)}`} className="tag">#{t}</Link>)}</div>}
 
       {conflict && <div className="callout warning conflict">
-        <b>This note was changed somewhere else</b> (another device or app) while you were writing here.
-        <div className="row wrap mt-s">
-          <button className="btn sm" onClick={takeTheirs}>Show theirs (drop mine)</button>
-          <button className="btn sm" onClick={mineAsCopy}>Keep mine as a copy</button>
-          <button className="btn sm danger" onClick={keepMine}>Overwrite with mine</button>
+        <Icon name="alert" size={15} />
+        <div className="grow">
+          <b>This note was changed somewhere else</b> (another device or app) while you were writing here.
+          <div className="row wrap mt-s">
+            <button type="button" className="btn sm" onClick={takeTheirs}>Show theirs (drop mine)</button>
+            <button type="button" className="btn sm" onClick={mineAsCopy}>Keep mine as a copy</button>
+            <button type="button" className="btn sm danger" onClick={keepMine}>Overwrite with mine</button>
+          </div>
         </div>
       </div>}
 
@@ -467,14 +469,10 @@ const NoteView = forwardRef<NoteViewHandle, { id: number; onBack?: () => void; e
         {panel && <div className="panel-scrim" onClick={() => setPanel('')} />}
         {panel && <aside className="note-panel">
           <div className="panel-head">
-          <div className="segmented sm">
-            <button className={panel === 'outline' ? 'active' : ''} onClick={() => setPanel('outline')}>Outline</button>
-            <button className={panel === 'links' ? 'active' : ''} onClick={() => setPanel('links')}>Links</button>
-            <button className={panel === 'info' ? 'active' : ''} onClick={() => setPanel('info')}>Info</button>
+            <Segmented size="sm" label="Panel" value={panel} onChange={setPanel} options={[{ value: 'outline' as const, label: 'Outline' }, { value: 'links' as const, label: 'Links' }, { value: 'info' as const, label: 'Info' }]} />
+            <button type="button" className="btn ghost icon-only sm panel-close" onClick={() => setPanel('')} aria-label="Close"><Icon name="x" size={16} /></button>
           </div>
-          <button className="btn ghost icon sm panel-close" onClick={() => setPanel('')} aria-label="Close">✕</button>
-          </div>
-          {panel === 'outline' && (outline.length ? <ul className="outline">{outline.map((h, i) => <li key={i} style={{ paddingLeft: (h.level - 1) * 12 }}><button onClick={() => { if (isPhone()) setPanel(''); if (mode === 'rich') rich.current?.scrollToHeading(h.text, outline.slice(0, i).filter(x => x.text === h.text).length); else md.current?.scrollToLine(h.line) }}>{h.text}</button></li>)}</ul> : <p className="muted small">No headings in this note.</p>)}
+          {panel === 'outline' && (outline.length ? <ul className="outline">{outline.map((h, i) => <li key={i} style={{ paddingLeft: (h.level - 1) * 12 }}><button type="button" onClick={() => { if (phone()) setPanel(''); if (mode === 'rich') rich.current?.scrollToHeading(h.text, outline.slice(0, i).filter(x => x.text === h.text).length); else md.current?.scrollToLine(h.line) }}>{h.text}</button></li>)}</ul> : <p className="muted small">No headings in this note.</p>)}
           {panel === 'links' && <Backlinks id={note.id} etag={note.etag} />}
           {panel === 'info' && <Info note={note} words={words} chars={draft.length} />}
         </aside>}
@@ -510,44 +508,40 @@ const NoteView = forwardRef<NoteViewHandle, { id: number; onBack?: () => void; e
 
 export default NoteView
 
-/** The one-pane layout (styles.css: max-width 760px). */
-function isPhone() { return window.matchMedia('(max-width: 760px)').matches }
+/** The one-pane layout (styles/notes.css: max-width 767px). */
+function phone() { return window.matchMedia('(max-width: 767px)').matches }
 
 function MdToolbar({ ed, onTool, onAttach, onTemplates, tools }: { ed: React.RefObject<MarkdownEditorHandle | null>; onTool: (t: string) => void; onAttach: (s: string) => void; onTemplates: () => void; tools: string[] }) {
-  const [open, setOpen] = useState(false)
-  const b = (label: string, title: string, fn: () => void) => <button className="btn ghost sm" title={title} onMouseDown={e => e.preventDefault()} onClick={fn}>{label}</button>
-  const items: [string, string][] = [['link', 'Link to something…'], ['bookmark', 'Web bookmark…'], ['task', 'Make this line a task…'], ['expense', 'Make this line a transaction…'], ['snapshot', 'Homelab snapshot'], ['attention', 'What needs attention'], ['media', 'Watched and listened this week'], ['spent', 'Spending this month'], ['fuel', 'Vehicle log'], ['hosts', 'Hosts on the network'], ['processes', 'Server processes'], ['habits', 'Days of habits…'], ['voice', 'Voice memo…'], ['camera', 'Take a photo…']]
+  const b = (label: React.ReactNode, title: string, fn: () => void) => <button type="button" className="btn ghost sm" title={title} aria-label={title} onMouseDown={e => e.preventDefault()} onClick={fn}>{label}</button>
+  const i = (name: string) => <Icon name={name} size={15} />
+  const items: [string, string, string][] = [['link', 'Link to something…', 'link'], ['bookmark', 'Web bookmark…', 'bookmark'], ['task', 'Make this line a task…', 'check-square'], ['expense', 'Make this line a transaction…', 'wallet'], ['snapshot', 'Homelab snapshot', 'server'], ['attention', 'What needs attention', 'alert'], ['media', 'Watched and listened this week', 'film'], ['spent', 'Spending this month', 'receipt'], ['fuel', 'Vehicle log', 'car'], ['hosts', 'Hosts on the network', 'globe'], ['processes', 'Server processes', 'activity'], ['habits', 'Days of habits…', 'habit'], ['voice', 'Voice memo…', 'mic'], ['camera', 'Take a photo…', 'camera']]
+  const menu = (): MenuItem[] => { const l = items.filter(([k]) => tools.includes(k)); return l.length ? l.map(([k, label, icon]) => ({ label, icon, onSelect: () => onTool(k) })) : [{ label: 'Nothing is connected yet', disabled: true }] }
   return (
     <div className="md-toolbar">
       <div className="md-tools">
-      {b('B', 'Bold (⌘B)', () => ed.current?.wrap('**'))}
-      {b('I', 'Italic (⌘I)', () => ed.current?.wrap('*'))}
-      {b('S̶', 'Strikethrough', () => ed.current?.wrap('~~'))}
-      {b('</>', 'Code', () => ed.current?.wrap('`'))}
+      {b(<b>B</b>, 'Bold (⌘B)', () => ed.current?.wrap('**'))}
+      {b(<i>I</i>, 'Italic (⌘I)', () => ed.current?.wrap('*'))}
+      {b(<s>S</s>, 'Strikethrough', () => ed.current?.wrap('~~'))}
+      {b(i('code'), 'Code', () => ed.current?.wrap('`'))}
       <span className="sep" />
       {b('H1', 'Heading 1', () => ed.current?.linePrefix('# '))}
       {b('H2', 'Heading 2', () => ed.current?.linePrefix('## '))}
       {b('H3', 'Heading 3', () => ed.current?.linePrefix('### '))}
       <span className="sep" />
-      {b('•', 'Bulleted list', () => ed.current?.linePrefix('- '))}
-      {b('1.', 'Numbered list', () => ed.current?.linePrefix('1. '))}
-      {b('☐', 'Task', () => ed.current?.linePrefix('- [ ] '))}
-      {b('❝', 'Quote', () => ed.current?.linePrefix('> '))}
-      {b('🔗', 'Link (⌘K)', () => ed.current?.wrap('[', '](https://)'))}
-      {b('▦', 'Table', () => ed.current?.insert('| Column | Column |\n| --- | --- |\n|  |  |', true))}
-      {b('{ }', 'Code block', () => ed.current?.insert('```\n\n```', true))}
+      {b(i('list'), 'Bulleted list', () => ed.current?.linePrefix('- '))}
+      {b(i('list-ordered'), 'Numbered list', () => ed.current?.linePrefix('1. '))}
+      {b(i('check-square'), 'Task', () => ed.current?.linePrefix('- [ ] '))}
+      {b(i('quote'), 'Quote', () => ed.current?.linePrefix('> '))}
+      {b(i('link'), 'Link (⌘K)', () => ed.current?.wrap('[', '](https://)'))}
+      {b(i('table'), 'Table', () => ed.current?.insert('| Column | Column |\n| --- | --- |\n|  |  |', true))}
+      {b(<span className="mono">{'{ }'}</span>, 'Code block', () => ed.current?.insert('```\n\n```', true))}
       <span className="sep" />
-      {b('📎', 'Attach a file', () => onAttach('device'))}
-      {b('🖼', 'From Photos (Immich)', () => onAttach('immich'))}
-      {b('☁', 'From Nextcloud', () => onAttach('nextcloud'))}
-      {b('📋', 'My templates', onTemplates)}
+      {b(i('paperclip'), 'Attach a file', () => onAttach('device'))}
+      {b(i('image'), 'From Photos (Immich)', () => onAttach('immich'))}
+      {b(i('cloud'), 'From Nextcloud', () => onAttach('nextcloud'))}
+      {b(i('template'), 'My templates', onTemplates)}
       </div>
-      <div className="menu-wrap">
-        <button className="btn ghost sm" onClick={() => setOpen(o => !o)}>Homelab ▾</button>
-        {open && <div className="menu" onMouseLeave={() => setOpen(false)} onClick={() => setOpen(false)}>
-          {items.filter(([k]) => tools.includes(k)).map(([k, l]) => <button key={k} onClick={() => onTool(k)}>{l}</button>)}
-        </div>}
-      </div>
+      <MenuButton label="Homelab tools" className="btn ghost sm" align="right" width={250} items={menu}><Icon name="server" size={15} />Homelab<Icon name="chevron-down" size={13} /></MenuButton>
     </div>
   )
 }
@@ -558,9 +552,9 @@ function Backlinks({ id, etag }: { id: number; etag: string }) {
   if (!data) return <Loading />
   return (
     <div className="links-panel">
-      <h4>Linked from</h4>
+      <h4 className="panel-h">Linked from</h4>
       {data.backlinks.length ? data.backlinks.map(n => <Link key={n.id} className="mini-note" to={`/note/${n.id}${location.search}`}><b>{n.title}</b><small className="muted">{n.category || 'Notes'} · {ago(n.modified)}</small></Link>) : <p className="muted small">No note links here yet. Type <code>[[</code> in another note to link to this one.</p>}
-      {data.mentions.length > 0 && <><h4 className="mt">Mentioned in</h4>{data.mentions.map(n => <Link key={n.id} className="mini-note" to={`/note/${n.id}${location.search}`}><b>{n.title}</b><small className="muted">{n.category || 'Notes'}</small></Link>)}</>}
+      {data.mentions.length > 0 && <><h4 className="panel-h mt">Mentioned in</h4>{data.mentions.map(n => <Link key={n.id} className="mini-note" to={`/note/${n.id}${location.search}`}><b>{n.title}</b><small className="muted">{n.category || 'Notes'}</small></Link>)}</>}
     </div>
   )
 }

@@ -2,6 +2,8 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { api, ApiError, V1, qs } from '../lib/api'
 import type { Note } from '../lib/types'
 import { Field, Loading, Modal, Segmented, useDebounce, useToast } from './ui'
+import { Icon } from './icons'
+import { Select } from './Select'
 import { ago, bytes } from '../lib/format'
 
 // The sheets behind the editor's homelab tools: what the app shows as its own pickers. Each
@@ -20,7 +22,7 @@ export function toolError(e: unknown): string {
 interface LinkItem { id: string; title: string; detail: string; url: string; icon: string; markdown: string; photo?: string; initials?: string; color?: string }
 interface LinkAnswer { sections: { source: string; title: string; items: LinkItem[] }[]; errors?: Record<string, string>; note?: string }
 
-const ICONS: Record<string, string> = { person: '👤', file: '📄', folder: '📁', document: '🧾', book: '📖', podcast: '🎧', moment: '⏱', issue: '◎', pull: '⇄', movie: '🎬', series: '📺', episode: '📺', photo: '🖼', link: '🔗' }
+const ICONS: Record<string, string> = { person: 'user', file: 'file', folder: 'folder', document: 'receipt', book: 'book', podcast: 'headphones', moment: 'timer', issue: 'dot-circle', pull: 'git-pull', movie: 'film', series: 'tv', episode: 'tv', photo: 'image', link: 'link' }
 
 export function LinkPicker({ onPick, onClose }: { onPick: (md: string) => void; onClose: () => void }) {
   const [q, setQ] = useState('')
@@ -38,7 +40,7 @@ export function LinkPicker({ onPick, onClose }: { onPick: (md: string) => void; 
   const sections = data?.sections?.filter(s => s.items.length) || []
   return (
     <Modal title="Link to something" onClose={onClose} size="lg">
-      <div className="tool-search"><span className="muted">⌕</span><input autoFocus value={q} onChange={e => setQ(e.target.value)} placeholder="Search people, files, documents, books, episodes, issues, films, photos…" />{busy && <span className="spinner" />}</div>
+      <div className="tool-search"><Icon name="search" size={15} /><input autoFocus value={q} onChange={e => setQ(e.target.value)} placeholder="Search people, files, documents, books, episodes, issues, films, photos…" />{busy && <span className="spinner" />}</div>
       <div className="tool-results">
         {err && <div className="callout danger">{err}</div>}
         {!sections.length && !busy && !err && <p className="muted center pad">{q.trim().length < 2 ? 'Type a few letters. The note gets a link to what you pick, not a copy.' : `Nothing matches “${q}”.`}</p>}
@@ -46,8 +48,8 @@ export function LinkPicker({ onPick, onClose }: { onPick: (md: string) => void; 
           <div key={s.source} className="tool-section">
             <h4>{s.title}</h4>
             {s.items.map(it => (
-              <button key={it.id} className="tool-row" onClick={() => onPick(it.markdown || `[${it.title}](${it.url})`)}>
-                {it.icon === 'person' ? <PersonAvatar item={it} /> : <span className="ico">{ICONS[it.icon] || '🔗'}</span>}
+              <button type="button" key={it.id} className="tool-row" onClick={() => onPick(it.markdown || `[${it.title}](${it.url})`)}>
+                {it.icon === 'person' ? <PersonAvatar item={it} /> : <span className="ico"><Icon name={ICONS[it.icon] || 'link'} size={16} /></span>}
                 <span className="grow"><b>{it.title}</b>{it.detail && <small className="muted">{it.detail}</small>}</span>
               </button>
             ))}
@@ -85,7 +87,7 @@ export function BookmarkSheet({ onPick, onClose }: { onPick: (md: string) => voi
     <Modal title="Web bookmark" onClose={onClose}>
       <form onSubmit={add} className="grid" style={{ gap: 14 }}>
         <Field label="Address" help="The page's title becomes the link's words."><input autoFocus value={url} onChange={e => setUrl(e.target.value)} placeholder="https://…" spellCheck={false} required /></Field>
-        <div className="form-actions"><button type="button" className="btn" onClick={onClose}>Cancel</button><button className="btn primary" disabled={busy}>{busy ? 'Reading the page…' : 'Add'}</button></div>
+        <div className="form-actions"><button type="button" className="btn" onClick={onClose}>Cancel</button><button type="submit" className="btn primary" disabled={busy}>{busy ? 'Reading the page…' : 'Add'}</button></div>
       </form>
     </Modal>
   )
@@ -126,7 +128,7 @@ export function PhotoPicker({ noteID, onPick, onClose }: { noteID: number; onPic
   return (
     <Modal title="From Photos" onClose={onClose} size="xl">
       <div className="row wrap mb">
-        <div className="tool-search grow"><span className="muted">⌕</span><input autoFocus value={q} onChange={e => setQ(e.target.value)} placeholder="Search Immich: “beach at sunset”, “server rack”, “invoice”…" />{busy && <span className="spinner" />}</div>
+        <div className="tool-search grow"><Icon name="search" size={15} /><input autoFocus value={q} onChange={e => setQ(e.target.value)} placeholder="Search Immich: “beach at sunset”, “server rack”, “invoice”…" />{busy && <span className="spinner" />}</div>
         <Segmented size="sm" value={favorites ? 'fav' : 'all'} onChange={v => setFavorites(v === 'fav')} options={[{ value: 'all', label: 'Newest' }, { value: 'fav', label: '★ Favourites' }]} />
       </div>
       {err && <div className="callout danger mb">{err}</div>}
@@ -134,7 +136,7 @@ export function PhotoPicker({ noteID, onPick, onClose }: { noteID: number; onPic
         {items.map(p => {
           const i = picked.indexOf(p.id)
           return (
-            <button key={p.id} className={`photo ${i >= 0 ? 'on' : ''}`} onClick={() => toggle(p.id)} title={`${p.filename} · ${new Date(p.date).toLocaleDateString()}`}>
+            <button type="button" key={p.id} className={`photo ${i >= 0 ? 'on' : ''}`} onClick={() => toggle(p.id)} title={`${p.filename} · ${new Date(p.date).toLocaleDateString()}`}>
               <img loading="lazy" src={`${V1}/tools/photos/${encodeURIComponent(p.id)}/thumb?size=thumbnail`} alt={p.filename} />
               {i >= 0 && <span className="pick">{i + 1}</span>}
             </button>
@@ -142,13 +144,13 @@ export function PhotoPicker({ noteID, onPick, onClose }: { noteID: number; onPic
         })}
       </div>
       {!busy && !items.length && !err && <p className="muted center pad">No pictures found.</p>}
-      {next > 0 && <div className="center mt"><button className="btn" onClick={() => load(next)} disabled={busy}>More</button></div>}
+      {next > 0 && <div className="center mt"><button type="button" className="btn" onClick={() => load(next)} disabled={busy}>More</button></div>}
       <div className="modal-foot">
         <Segmented size="sm" value={mode} onChange={setMode} options={[{ value: 'copy', label: 'Put in the note' }, { value: 'link', label: 'Link to Immich' }]} />
         {mode === 'copy' && <Segmented size="sm" value={size} onChange={setSize} options={[{ value: 'preview', label: 'Preview size' }, { value: 'original', label: 'Original' }]} />}
         <span className="spacer" />
-        <button className="btn" onClick={onClose}>Cancel</button>
-        <button className="btn primary" disabled={!picked.length || adding} onClick={add}>{adding ? 'Adding…' : picked.length ? `Add ${picked.length}` : 'Add'}</button>
+        <button type="button" className="btn" onClick={onClose}>Cancel</button>
+        <button type="button" className="btn primary" disabled={!picked.length || adding} onClick={add}>{adding ? 'Adding…' : picked.length ? `Add ${picked.length}` : 'Add'}</button>
       </div>
     </Modal>
   )
@@ -178,30 +180,33 @@ export function FilesPicker({ noteID, onPick, onClose }: { noteID: number; onPic
   return (
     <Modal title="From Nextcloud" onClose={onClose} size="lg">
       <div className="crumbs mb">
-        <button className="btn ghost sm" onClick={() => setPath('/')}>Files</button>
-        {crumbs.map((c, i) => <span key={i} className="row"><span className="muted">/</span><button className="btn ghost sm" onClick={() => setPath('/' + crumbs.slice(0, i + 1).join('/'))}>{c}</button></span>)}
+        <button type="button" className="btn ghost sm" onClick={() => setPath('/')}>Files</button>
+        {crumbs.map((c, i) => <span key={i} className="row"><span className="muted">/</span><button type="button" className="btn ghost sm" onClick={() => setPath('/' + crumbs.slice(0, i + 1).join('/'))}>{c}</button></span>)}
         {busy && <span className="spinner" />}
       </div>
       {err && <div className="callout danger mb">{err}</div>}
       <div className="tool-results files">
         {data?.items.map(f => (
-          <button key={f.path} className="tool-row" onClick={() => f.dir ? setPath(f.path) : pick(f)}>
-            <span className="ico">{f.dir ? '📁' : f.mime?.startsWith('image/') ? '🖼' : '📄'}</span>
+          <button type="button" key={f.path} className="tool-row" onClick={() => f.dir ? setPath(f.path) : pick(f)}>
+            <span className="ico"><Icon name={f.dir ? 'folder' : f.mime?.startsWith('image/') ? 'image' : 'file'} size={16} /></span>
             <span className="grow"><b>{f.name}</b><small className="muted">{f.dir ? 'Folder' : `${bytes(f.size)} · ${ago(f.modified)}`}</small></span>
-            {f.dir && <span className="muted">›</span>}
+            {f.dir && <Icon name="chevron-right" size={14} className="muted" />}
           </button>
         ))}
         {data && !data.items.length && <p className="muted center pad">This folder is empty.</p>}
       </div>
       <div className="modal-foot">
         <Segmented size="sm" value={mode} onChange={setMode} options={[{ value: 'link', label: 'Link to it' }, { value: 'copy', label: 'Copy into the note' }]} />
-        <span className="spacer" /><button className="btn" onClick={onClose}>Cancel</button>
+        <span className="spacer" /><button type="button" className="btn" onClick={onClose}>Cancel</button>
       </div>
     </Modal>
   )
 }
 
 // ---------------------------------------------------------------- task (Nextcloud Tasks / Deck)
+
+/** Deck keeps colours without the #. */
+const hex = (c?: string) => (c && /^[0-9a-f]{6}$/i.test(c) ? '#' + c : c || undefined)
 
 interface TaskTargets { lists: { id: string; name: string; color?: string }[]; boards: { id: number; title: string; color?: string; stacks: { id: number; title: string }[] }[]; default?: 'tasks' | 'deck'; errors?: Record<string, string> }
 
@@ -237,16 +242,16 @@ export function TaskSheet({ line, onDone, onClose }: { line: string; onDone: (md
         <Field label="Task"><input autoFocus value={text} onChange={e => setText(e.target.value)} required /></Field>
         <Field group label="Send to"><Segmented value={dest} onChange={setDest} options={[{ value: 'tasks', label: 'Nextcloud Tasks' }, { value: 'deck', label: 'Deck' }]} /></Field>
         {dest === 'tasks' ? (
-          <Field label="List">{targets.lists.length ? <select value={list} onChange={e => setList(e.target.value)}>{targets.lists.map(l => <option key={l.id} value={l.id}>{l.name}</option>)}</select> : <p className="muted">No task list in Nextcloud. {targets.errors?.tasks}</p>}</Field>
+          <Field label="List">{targets.lists.length ? <Select value={list} onChange={setList} label="List" options={targets.lists.map(l => ({ value: l.id, label: l.name, color: hex(l.color) }))} /> : <p className="muted">No task list in Nextcloud. {targets.errors?.tasks}</p>}</Field>
         ) : (
           <div className="two-col tight">
-            <Field label="Board">{targets.boards.length ? <select value={board} onChange={e => { const b = Number(e.target.value); setBoard(b); setStack(targets.boards.find(x => x.id === b)?.stacks[0]?.id || 0) }}>{targets.boards.map(b => <option key={b.id} value={b.id}>{b.title}</option>)}</select> : <p className="muted">No Deck board. {targets.errors?.deck}</p>}</Field>
-            <Field label="List">{<select value={stack} onChange={e => setStack(Number(e.target.value))}>{stacks.map(s => <option key={s.id} value={s.id}>{s.title}</option>)}</select>}</Field>
+            <Field label="Board">{targets.boards.length ? <Select value={board} onChange={b => { setBoard(b); setStack(targets.boards.find(x => x.id === b)?.stacks[0]?.id || 0) }} label="Board" options={targets.boards.map(b => ({ value: b.id, label: b.title, color: hex(b.color) }))} /> : <p className="muted">No Deck board. {targets.errors?.deck}</p>}</Field>
+            <Field label="List"><Select value={stack} onChange={setStack} label="List" options={stacks.map(s => ({ value: s.id, label: s.title }))} /></Field>
           </div>
         )}
         <Field label="Due (optional)"><input type="date" value={due} onChange={e => setDue(e.target.value)} /></Field>
         <p className="muted small">The line stays in the note with a link to where it went.</p>
-        <div className="form-actions"><button type="button" className="btn" onClick={onClose}>Cancel</button><button className="btn primary" disabled={busy || (dest === 'tasks' ? !list : !stack)}>{busy ? 'Sending…' : 'Send'}</button></div>
+        <div className="form-actions"><button type="button" className="btn" onClick={onClose}>Cancel</button><button type="submit" className="btn primary" disabled={busy || (dest === 'tasks' ? !list : !stack)}>{busy ? 'Sending…' : 'Send'}</button></div>
       </form>}
     </Modal>
   )
@@ -276,9 +281,9 @@ export function ExpenseSheet({ line, onDone, onClose }: { line: string; onDone: 
       {!opts && !err && <Loading />}
       {opts && <form onSubmit={send} className="grid" style={{ gap: 14 }}>
         <Field label="Line" help="Template or category + amount + what for, e.g. groceries 24.50 bread"><input autoFocus value={text} onChange={e => setText(e.target.value)} required /></Field>
-        {!!opts.accounts?.length && <Field label="From account"><select value={account} onChange={e => setAccount(e.target.value)}>{opts.accounts.map(a => <option key={a.id} value={String(a.id)}>{a.name}{a.currency ? ` (${a.currency})` : ''}</option>)}</select></Field>}
+        {!!opts.accounts?.length && <Field label="From account"><Select value={account} onChange={setAccount} label="From account" options={opts.accounts.map(a => ({ value: String(a.id), label: a.name, hint: a.currency || undefined }))} /></Field>}
         <Field label="Date"><input type="date" value={date} onChange={e => setDate(e.target.value)} /></Field>
-        <div className="form-actions"><button type="button" className="btn" onClick={onClose}>Cancel</button><button className="btn primary" disabled={busy}>{busy ? 'Booking…' : 'Book it'}</button></div>
+        <div className="form-actions"><button type="button" className="btn" onClick={onClose}>Cancel</button><button type="submit" className="btn primary" disabled={busy}>{busy ? 'Booking…' : 'Book it'}</button></div>
       </form>}
     </Modal>
   )
@@ -302,7 +307,7 @@ export function HabitsSheet({ onDone, onClose }: { onDone: (md: string) => void;
         <p className="muted">Habits done and missed, trackers and journal lines from Pocket Habits.</p>
         <div className="two-col tight"><Field label="From"><input type="date" value={from} onChange={e => setFrom(e.target.value)} /></Field><Field label="To"><input type="date" value={to} onChange={e => setTo(e.target.value)} /></Field></div>
         {err && <div className="callout danger">{err}</div>}
-        <div className="form-actions"><button type="button" className="btn" onClick={onClose}>Cancel</button><button className="btn primary" disabled={busy}>{busy ? 'Reading…' : 'Put in the note'}</button></div>
+        <div className="form-actions"><button type="button" className="btn" onClick={onClose}>Cancel</button><button type="submit" className="btn primary" disabled={busy}>{busy ? 'Reading…' : 'Put in the note'}</button></div>
       </form>
     </Modal>
   )
@@ -359,14 +364,14 @@ export function VoiceMemo({ upload, onDone, onClose }: { upload: (f: File) => Pr
     <Modal title="Voice memo" onClose={onClose}>
       <div className="voice">
         <div className="voice-time">{Math.floor(secs / 60)}:{String(secs % 60).padStart(2, '0')}</div>
-        {state === 'idle' && <button className="btn primary lg" onClick={start}>● Record</button>}
-        {state === 'rec' && <button className="btn danger lg" onClick={stop}>■ Stop</button>}
+        {state === 'idle' && <button type="button" className="btn primary lg" onClick={start}><Icon name="record" size={14} />Record</button>}
+        {state === 'rec' && <button type="button" className="btn danger lg" onClick={stop}><Icon name="stop" size={13} />Stop</button>}
         {(state === 'done' || state === 'saving') && blob && <audio controls src={useMemoURL(blob)} />}
         {words && <blockquote className="muted">{words}</blockquote>}
         {err && <div className="callout danger">{err}</div>}
         <p className="muted small">The recording is stored with the note{('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) ? ', with its words written out' : ''}.</p>
       </div>
-      <div className="form-actions"><button className="btn" onClick={onClose}>Cancel</button><button className="btn primary" disabled={state !== 'done'} onClick={save}>{state === 'saving' ? 'Saving…' : 'Add to the note'}</button></div>
+      <div className="form-actions"><button type="button" className="btn" onClick={onClose}>Cancel</button><button type="button" className="btn primary" disabled={state !== 'done'} onClick={save}>{state === 'saving' ? 'Saving…' : 'Add to the note'}</button></div>
     </Modal>
   )
 }
@@ -392,7 +397,7 @@ export function TemplatePicker({ title, onPick, onClose }: { title: string; onPi
       {err && <div className="callout danger">{err}</div>}
       {!list && !err && <Loading />}
       {list && !list.length && <p className="muted">No templates yet. Notes in your templates folder (Settings → Writing) show up here; <code>{'{{date}}'}</code>, <code>{'{{time}}'}</code>, <code>{'{{weekday}}'}</code> and <code>{'{{title}}'}</code> are filled in.</p>}
-      {list && <div className="tool-results">{list.map(n => <button key={n.id} className="tool-row" onClick={() => pick(n)}><span className="ico">📋</span><span className="grow"><b>{n.title}</b><small className="muted">{n.excerpt}</small></span></button>)}</div>}
+      {list && <div className="tool-results">{list.map(n => <button type="button" key={n.id} className="tool-row" onClick={() => pick(n)}><span className="ico"><Icon name="template" size={16} /></span><span className="grow"><b>{n.title}</b><small className="muted">{n.excerpt}</small></span></button>)}</div>}
     </Modal>
   )
 }
@@ -403,7 +408,7 @@ export function DiagramViewer({ svg, onClose }: { svg: string; onClose: () => vo
   const [zoom, setZoom] = useState(1)
   return (
     <Modal title="Diagram" onClose={onClose} size="xl">
-      <div className="row mb"><button className="btn sm" onClick={() => setZoom(z => Math.max(0.25, z / 1.25))}>−</button><span className="muted small">{Math.round(zoom * 100)}%</span><button className="btn sm" onClick={() => setZoom(z => Math.min(6, z * 1.25))}>+</button><button className="btn ghost sm" onClick={() => setZoom(1)}>Fit</button></div>
+      <div className="row mb"><button type="button" className="btn sm icon-only" aria-label="Zoom out" onClick={() => setZoom(z => Math.max(0.25, z / 1.25))}><Icon name="zoom-out" size={15} /></button><span className="muted small">{Math.round(zoom * 100)}%</span><button type="button" className="btn sm icon-only" aria-label="Zoom in" onClick={() => setZoom(z => Math.min(6, z * 1.25))}><Icon name="zoom-in" size={15} /></button><button type="button" className="btn ghost sm" onClick={() => setZoom(1)}>Fit</button></div>
       <div className="diagram-view"><div style={{ transform: `scale(${zoom})`, transformOrigin: '0 0' }} dangerouslySetInnerHTML={{ __html: svg }} /></div>
     </Modal>
   )

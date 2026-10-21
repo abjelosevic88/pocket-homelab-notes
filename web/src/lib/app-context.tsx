@@ -4,6 +4,8 @@ import type { Folder, Settings, SyncStatus, TagCount, Tools, User } from './type
 
 interface AuthStatus { needs_setup: boolean; auth_mode: string; authenticated: boolean; user: User | null; version: string; title: string; oidc?: boolean; oidc_name?: string }
 
+export type ThemeMode = 'system' | 'light' | 'dark'
+
 interface AppState {
   status: AuthStatus | null
   user: User | null
@@ -16,7 +18,10 @@ interface AppState {
   /** Changes whenever notes were added, renamed, moved or deleted: lists reload on it. */
   version: number
   bump: () => void
+  /** The appearance chosen: the system's unless set to light or dark. */
+  themeMode: ThemeMode
   theme: 'light' | 'dark'
+  setThemeMode: (m: ThemeMode) => void
   toggleTheme: () => void
   refresh: () => Promise<void>
   reloadMeta: () => Promise<void>
@@ -38,9 +43,22 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const [tools, setTools] = useState<Tools>({})
   const [sync, setSync] = useState<SyncStatus | null>(null)
   const [version, setVersion] = useState(0)
-  const [theme, setTheme] = useState<'light' | 'dark'>(() => (localStorage.getItem('pn-theme') as 'light' | 'dark') || (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'))
-
-  useEffect(() => { document.documentElement.dataset.theme = theme; localStorage.setItem('pn-theme', theme) }, [theme])
+  // The theme follows the system unless one is chosen (pn-theme holds the choice; the shared-note
+  // page reads it too).
+  const [themeMode, setThemeModeRaw] = useState<ThemeMode>(() => (localStorage.getItem('pn-theme') as ThemeMode) || 'system')
+  const [systemDark, setSystemDark] = useState(() => window.matchMedia('(prefers-color-scheme: dark)').matches)
+  useEffect(() => {
+    const mq = window.matchMedia('(prefers-color-scheme: dark)')
+    const h = () => setSystemDark(mq.matches)
+    mq.addEventListener('change', h)
+    return () => mq.removeEventListener('change', h)
+  }, [])
+  const theme: 'light' | 'dark' = themeMode === 'system' ? (systemDark ? 'dark' : 'light') : themeMode
+  useEffect(() => {
+    document.documentElement.dataset.theme = theme
+    document.querySelectorAll('meta[name="theme-color"]').forEach(m => m.setAttribute('content', theme === 'dark' ? '#111113' : '#ffffff'))
+  }, [theme])
+  const setThemeMode = useCallback((m: ThemeMode) => { setThemeModeRaw(m); if (m === 'system') localStorage.removeItem('pn-theme'); else localStorage.setItem('pn-theme', m) }, [])
   useEffect(() => { if (settings?.title) document.title = settings.title }, [settings?.title])
 
   const reloadMeta = useCallback(async () => {
@@ -107,5 +125,5 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     return () => { clearInterval(t); document.removeEventListener('visibilitychange', onShow); window.removeEventListener('focus', onShow) }
   }, [user, bump])
 
-  return <Ctx.Provider value={{ status, user, settings, users, folders, tags, tools, sync, version, bump, theme, toggleTheme: () => setTheme(t => t === 'dark' ? 'light' : 'dark'), refresh, reloadMeta, reloadTree, setUser, setSettings }}>{children}</Ctx.Provider>
+  return <Ctx.Provider value={{ status, user, settings, users, folders, tags, tools, sync, version, bump, themeMode, theme, setThemeMode, toggleTheme: () => setThemeMode(theme === 'dark' ? 'light' : 'dark'), refresh, reloadMeta, reloadTree, setUser, setSettings }}>{children}</Ctx.Provider>
 }
