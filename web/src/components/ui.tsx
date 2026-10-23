@@ -128,12 +128,17 @@ export function SettingRow({ title, help, children, stack }: { title: React.Reac
   )
 }
 
-export function Segmented<T extends string | number>({ options, value, onChange, size = '', className = '', label }: { options: { value: T; label: React.ReactNode; title?: string }[]; value: T | null; onChange: (v: T) => void; size?: '' | 'sm'; className?: string; label?: string }) {
+export function Segmented<T extends string | number>({ options, value, onChange, size = '', className = '', label }: { options: { value: T; label: React.ReactNode; title?: string; disabled?: boolean }[]; value: T | null; onChange: (v: T) => void; size?: '' | 'sm'; className?: string; label?: string }) {
   return (
     <div className={`segmented ${size} ${className}`} role="radiogroup" aria-label={label}>
-      {options.map(o => <button key={String(o.value)} type="button" role="radio" aria-checked={o.value === value} title={o.title} className={o.value === value ? 'active' : ''} onClick={() => onChange(o.value)}>{o.label}</button>)}
+      {options.map(o => <button key={String(o.value)} type="button" role="radio" aria-checked={o.value === value} title={o.title} className={o.value === value ? 'active' : ''} disabled={o.disabled} aria-disabled={o.disabled || undefined} onClick={() => { if (!o.disabled) onChange(o.value) }}>{o.label}</button>)}
     </div>
   )
+}
+
+/** Under a choice that only works through Pocket Core, when this server is not connected to one (the choice itself is shown greyed out). */
+export function NeedsCore({ className = '' }: { className?: string }) {
+  return <p className={`needs-core small muted ${className}`}><Icon name="info" size={13} /><span>Needs Pocket Core. Pocket Core connects your Pocket apps to each other and to your services: one sign-in for everyone, each person's own accounts, nothing to copy or paste. Set <code>CORE_URL</code> to connect this app. <a href="https://github.com/abjelosevic88/pocket-homelab-core" target="_blank" rel="noreferrer">Learn more</a></span></p>
 }
 
 export function Tabs<T extends string>({ tabs, value, onChange }: { tabs: { id: T; label: string; icon?: string }[]; value: T; onChange: (t: T) => void }) {

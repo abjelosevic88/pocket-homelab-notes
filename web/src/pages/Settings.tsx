@@ -4,7 +4,7 @@ import { useNavigate, useParams } from 'react-router-dom'
 import { api, upload, V1 } from '../lib/api'
 import { useApp } from '../lib/app-context'
 import type { APIToken, Integration, Settings as SettingsT, StorageInfo, StorageKind, User } from '../lib/types'
-import { Confirm, CopyField, Field, Loading, Modal, Segmented, SettingRow, Switch, Tabs, useAsync, useIsMobile, useToast } from '../components/ui'
+import { Confirm, CopyField, Field, Loading, Modal, NeedsCore, Segmented, SettingRow, Switch, Tabs, useAsync, useIsMobile, useToast } from '../components/ui'
 import { Icon } from '../components/icons'
 import { Select } from '../components/Select'
 import { Avatar } from '../components/people'
@@ -223,7 +223,7 @@ function Storage() {
   const [ask, setAsk] = useState(false)
   const [syncing, setSyncing] = useState(false)
   useEffect(() => {
-    if (data) setF({ kind: data.kind, path: data.path, url: data.url, user: data.user, password: '', folder: data.folder || 'Notes', via_core: data.kind === 'nextcloud' ? data.via_core : !!data.core_nextcloud })
+    if (data) setF({ kind: data.kind, path: data.path, url: data.url, user: data.user, password: '', folder: data.folder || 'Notes', via_core: data.core && (data.kind === 'nextcloud' ? data.via_core : !!data.core_nextcloud) })
   }, [data])
   if (!data) return <Loading />
   const st = data.status || {}
@@ -250,7 +250,8 @@ function Storage() {
     setSyncing(true)
     try { const s = await api.post<{ files: number; added: number; changed: number; removed: number; moved: number }>(`${V1}/sync`); toast(`${s.files} notes · ${s.added} new · ${s.changed} changed · ${s.moved} moved · ${s.removed} removed`); bump(); reload() } catch (e) { toast((e as Error).message, 'err') } finally { setSyncing(false) }
   }
-  const kinds = KINDS.filter(k => (k.kind !== 'folder' || (data.roots && data.roots.length)) && (k.kind !== 'files' || data.core || data.kind === 'files'))
+  // Pocket Files is always listed; without Pocket Core it is greyed out with a word on why.
+  const kinds = KINDS.filter(k => k.kind !== 'folder' || (data.roots && data.roots.length))
   return (
     <div className="stack loose">
       <Section title="Where your notes are" actions={<button type="button" className="btn sm" onClick={syncNow} disabled={syncing}><Icon name="refresh" size={14} />{syncing ? 'Syncing…' : 'Sync now'}</button>}>
@@ -266,12 +267,13 @@ function Storage() {
       <Section title="Change where they are" sub="Test a place first: it says what is there. Nothing moves until you choose.">
         <div className="storage-kinds">
           {kinds.map(k => (
-            <button type="button" key={k.kind} className={`storage-kind ${f.kind === k.kind ? 'active' : ''}`} aria-pressed={f.kind === k.kind} onClick={() => set({ kind: k.kind })}><Icon name={k.icon} size={18} /><b>{k.title}</b><small>{k.sub}</small></button>
+            <button type="button" key={k.kind} className={`storage-kind ${f.kind === k.kind ? 'active' : ''}`} aria-pressed={f.kind === k.kind} disabled={k.kind === 'files' && !data.core} onClick={() => set({ kind: k.kind })}><Icon name={k.icon} size={18} /><b>{k.title}</b><small>{k.sub}</small></button>
           ))}
         </div>
+        {!data.core && <NeedsCore className="mt" />}
         <div className="stack mt" style={{ maxWidth: 620 }}>
           {f.kind === 'nextcloud' && <>
-            {data.core && <Field group label="Account"><Segmented value={f.via_core ? 'core' : 'own'} onChange={v => set({ via_core: v === 'core' })} options={[{ value: 'core', label: 'Through Pocket Core' }, { value: 'own', label: 'Type it in' }]} /></Field>}
+            <Field group label="Account"><Segmented value={f.via_core && data.core ? 'core' : 'own'} onChange={v => set({ via_core: v === 'core' })} options={[{ value: 'core', label: 'Through Pocket Core', disabled: !data.core }, { value: 'own', label: 'Type it in' }]} /></Field>
             {f.via_core && data.core ? (
               data.core_nextcloud ? <p className="muted">Pocket Core connects you as <b>{data.core_nextcloud.user}</b> at {data.core_nextcloud.url}. Nothing to type.</p> : <div className="callout warning"><Icon name="alert" size={15} /><span>Pocket Core has no Nextcloud account for you{data.core_nextcloud_error ? `: ${data.core_nextcloud_error}` : ''}. Add one in Core → Services, or type it in.</span></div>
             ) : <>
@@ -284,7 +286,7 @@ function Storage() {
             <Field label="Folder in your Nextcloud" help="Nextcloud Notes keeps notes in “Notes” unless its settings say otherwise (yours may be e.g. Nextcloud/Notes)."><input value={f.folder} onChange={e => set({ folder: e.target.value })} placeholder="Notes" /></Field>
           </>}
           {f.kind === 'files' && <>
-            {!data.core ? <div className="callout warning"><Icon name="alert" size={15} /><span>Pocket Files is reached through Pocket Core, and this server is not connected to one.</span></div>
+            {!data.core ? <div className="callout warning"><Icon name="alert" size={15} /><span>Pocket Files is reached through Pocket Core, and this server is not connected to one: choose another place.</span></div>
               : data.core_files?.on ? <p className="muted">Pocket Core lets Pocket Notes into your Pocket Files{data.core_files.url ? <> at {data.core_files.url}</> : ''}. Nothing to type. Notes deleted here go to your Pocket Files trash.</p>
               : <div className="callout warning"><Icon name="alert" size={15} /><span>Pocket Core does not let Pocket Notes into your Pocket Files{data.core_files?.reason ? `: ${data.core_files.reason}` : ''}. The link is “Pocket Notes → Pocket Files” in Core → Links.</span></div>}
             <Field label="Folder in your Pocket Files" help="A folder of your own there (not “Shared with me” or “Mounts” themselves); made when it is not there yet."><input value={f.folder} onChange={e => set({ folder: e.target.value })} placeholder="Notes" /></Field>
@@ -324,6 +326,7 @@ function Integrations() {
   return (
     <div className="stack loose">
       <div className="callout info"><Icon name="info" size={15} /><span>The editor's homelab tools (<code>/</code> in a note) read from these. {data.core ? 'Through Pocket Core each person uses their own account there; type an address and key in to connect directly instead.' : 'Type in an address and a key for each one you want.'}</span></div>
+      {!data.core && <NeedsCore />}
       {groups.map(([title, sub, items]) => <Section key={title} title={title} sub={sub}>{items.map(i => <IntegrationRow key={i.kind + i.name} i={i} core={data.core} onSaved={() => { reload(); reloadMeta() }} />)}</Section>)}
     </div>
   )
@@ -361,7 +364,7 @@ function IntegrationRow({ i, core, onSaved }: { i: Integration; core: boolean; o
         <div className="integration-actions">
           {dirty && <button type="button" className="btn primary sm" onClick={save} disabled={busy}>Save</button>}
           {mode !== 'off' && <button type="button" className="btn sm" onClick={test} disabled={busy}>{busy ? 'Testing…' : 'Test'}</button>}
-          <Segmented size="sm" value={mode} onChange={setMode} label={`${i.title}: how`} options={[...(core ? [{ value: 'core' as const, label: 'Pocket Core' }] : []), { value: 'direct' as const, label: 'Direct' }, { value: 'off' as const, label: 'Off' }]} />
+          <Segmented size="sm" value={mode} onChange={setMode} label={`${i.title}: how`} options={[{ value: 'core' as const, label: 'Pocket Core', disabled: !core }, { value: 'direct' as const, label: 'Direct' }, { value: 'off' as const, label: 'Off' }]} />
         </div>
       </div>
       {result && <div className={`integration-result small ${result.ok ? 'ok' : 'bad'}`}><Icon name={result.ok ? 'check-circle' : 'x-circle'} size={14} />{result.text}</div>}

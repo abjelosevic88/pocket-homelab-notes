@@ -268,7 +268,7 @@ func (s *Server) handleGetStorage(w http.ResponseWriter, r *http.Request) {
 	out := map[string]any{
 		"kind": st.StorageKind, "path": st.StoragePath, "url": st.StorageURL, "user": st.StorageUser, "folder": st.StorageFolder,
 		"via_core": st.StorageViaCore, "password_set": st.StoragePassword != "", "roots": s.cfg.StorageRoots,
-		"core": s.core.Configured(),
+		"core": s.coreReady(),
 	}
 	if l, err := s.lib(ctx, uid); err == nil {
 		out["status"] = l.status()

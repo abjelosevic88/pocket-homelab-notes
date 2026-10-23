@@ -408,7 +408,7 @@ func (s *Server) handleIntegrations(w http.ResponseWriter, r *http.Request) {
 			add("app", u.App, u.Reason)
 		}
 	}
-	writeJSON(w, http.StatusOK, map[string]any{"core": s.core.Configured(), "items": out})
+	writeJSON(w, http.StatusOK, map[string]any{"core": s.coreReady(), "items": out})
 }
 
 func validIntegration(kind, name string) bool {

@@ -421,6 +421,14 @@ func (s *Server) registerWithCore(ctx context.Context) error {
 // publish persists an event locally; the SDK retries network delivery. The payload
 // names whose note it was (user_id, user_email).
 
+// coreReady reports whether this server is configured for Pocket Core and its
+// last registration went through; settings grey out Core-only choices otherwise.
+func (s *Server) coreReady() bool {
+	s.coreMu.Lock()
+	defer s.coreMu.Unlock()
+	return s.core.Configured() && s.coreOK
+}
+
 // coreStatus summarises the Pocket Core link for the About page.
 func (s *Server) coreStatus() map[string]any {
 	s.coreMu.Lock()
