@@ -1,6 +1,13 @@
 <p align="center"><img src="web/public/favicon.svg" width="72" alt=""></p>
 <h1 align="center">Pocket Notes</h1>
 <p align="center">Self-hosted Markdown notes kept as plain files where you choose — on the server, in your Nextcloud or Pocket Files, on any WebDAV server or in a folder.<br>One Go binary, one SQLite file, one volume.</p>
+<p align="center">
+  <a href="https://github.com/abjelosevic88/pocket-homelab-notes/actions"><img src="https://github.com/abjelosevic88/pocket-homelab-notes/actions/workflows/ci.yml/badge.svg?branch=main" alt="CI"></a>
+  <a href="https://github.com/abjelosevic88/pocket-homelab-notes/pkgs/container/pocket-homelab-notes"><img src="https://img.shields.io/badge/ghcr.io-amd64%20%7C%20arm64-blue" alt="image"></a>
+  <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-green" alt="MIT"></a>
+</p>
+
+---
 
 Pocket Notes is a notes server that does what Nextcloud Notes does and a good deal more: full-text
 search, tags, links between notes with backlinks, every checkbox gathered into one task list, daily
