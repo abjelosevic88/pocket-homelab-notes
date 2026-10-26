@@ -1,5 +1,6 @@
 import { forwardRef, useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
+import { EMBEDDED } from '../lib/embed'
 import { api, ApiError, upload, V1, qs } from '../lib/api'
 import { useApp } from '../lib/app-context'
 import type { Note, Person } from '../lib/types'
@@ -439,7 +440,7 @@ const NoteView = forwardRef<NoteViewHandle, { id: number; onBack?: () => void; e
           <Segmented size="sm" className="mode-toggle" label="Editor" value={mode} onChange={m => { const p = rich.current?.flush(); if (p != null) changed(p); setMode(m); setRevision(r => r + 1) }}
             options={[{ value: 'rich' as const, label: 'Aa', title: 'Rich text' }, { value: 'markdown' as const, label: 'M↓', title: 'Markdown source' }]} />
           <button type="button" className={`btn ghost icon-only wide-only ${panel ? 'on' : ''}`} title="Outline, links and info" aria-label="Outline, links and info" aria-pressed={!!panel} onClick={() => setPanel(p => p ? '' : 'outline')}><Icon name="panel-right" size={17} /></button>
-          {phone() && <AskButton />}
+          {phone() && !EMBEDDED && <AskButton />}
           <MenuButton label="More" align="right" width={220} items={menuItems}><Icon name="more" size={18} /></MenuButton>
         </div>
       </header>

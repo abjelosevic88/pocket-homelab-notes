@@ -17,6 +17,7 @@ import Trash from './pages/Trash'
 import Settings from './pages/Settings'
 import NewFrom from './pages/NewFrom'
 import Share from './pages/Share'
+import EmbedNote, { EmbedClosed, EmbedGuard } from './pages/EmbedNote'
 import { ErrorBoundary } from './components/ErrorBoundary'
 
 function Gate({ children }: { children: React.ReactNode }) {
@@ -29,12 +30,15 @@ function Gate({ children }: { children: React.ReactNode }) {
 }
 
 function App() {
-  return (
+  return (<>
+    <EmbedGuard />
     <Routes>
       <Route path="/login" element={<Login mode="login" />} />
       <Route path="/setup" element={<Login mode="setup" />} />
       <Route path="/s/:token" element={<Share />} />
       <Route path="/settings/:tab?" element={<Gate><ErrorBoundary where="settings"><Settings /></ErrorBoundary></Gate>} />
+      <Route path="/embed/note/:id" element={<Gate><ErrorBoundary where="note"><EmbedNote /></ErrorBoundary></Gate>} />
+      <Route path="/embed/closed" element={<EmbedClosed />} />
       <Route element={<Gate><Layout /></Gate>}>
         <Route path="/" element={<Notes />} />
         <Route path="/note/:id" element={<Notes />} />
@@ -46,7 +50,7 @@ function App() {
         <Route path="*" element={<Navigate to="/" replace />} />
       </Route>
     </Routes>
-  )
+  </>)
 }
 
 function Root() {

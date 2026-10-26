@@ -354,3 +354,9 @@ a.welcome-stat:hover { border-color: var(--border-strong); }
 }
 .icon.star path { fill: currentColor; }
 .btn.on.star .icon path { fill: currentColor; }
+
+/* /embed/note/:id — one note in another app's side panel */
+.embed-note { height: 100vh; height: 100dvh; display: flex; flex-direction: column; min-height: 0; background: var(--bg); }
+.embed-note > .note-view { flex: 1; min-height: 0; }
+.embed-closed { align-items: center; justify-content: center; gap: 8px; color: var(--muted); }
+.embed-note .note-view .note-head { padding-left: 16px; }
