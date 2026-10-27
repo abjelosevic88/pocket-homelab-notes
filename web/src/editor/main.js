@@ -140,6 +140,7 @@ async function load(markdown, options) {
   attachments.share = options.share || null
   document.body.spellcheck = options.spellcheck !== false
   document.body.classList.toggle('compact', !!options.compact)
+  document.body.classList.toggle('reader', !!options.reader)
   document.body.classList.toggle('desktop', !!options.desktop)
   document.body.classList.toggle('phone', !options.desktop && !options.compact)
   closeEmojiPicker(); closeTurnIntoMenu()

@@ -49,6 +49,9 @@ const NoteView = forwardRef<NoteViewHandle, { id: number; onBack?: () => void; e
   // On a phone the panel covers the note, so it is never open on arrival there.
   const [panel, setPanel] = useState<'' | 'outline' | 'links' | 'info'>(() => phone() ? '' : (localStorage.getItem('pn-panel') as '' | 'outline' | 'links' | 'info') || '')
   const [sheet, setSheet] = useState<Sheet | null>(null)
+  // Reader mode stays on from note to note; an empty note still opens for writing.
+  const [readPref, setReadPref] = useState(() => localStorage.getItem('pn-read') === '1')
+  const [blank, setBlank] = useState(false)
   const [title, setTitle] = useState('')
   const rich = useRef<RichEditorHandle>(null)
   const md = useRef<MarkdownEditorHandle>(null)
@@ -59,6 +62,7 @@ const NoteView = forwardRef<NoteViewHandle, { id: number; onBack?: () => void; e
   const cur = useRef<{ id: number; etag: string; saved: string; draft: string; saving: boolean; again: boolean; timer: number }>({ id: 0, etag: '', saved: '', draft: '', saving: false, again: false, timer: 0 })
 
   useEffect(() => { localStorage.setItem('pn-mode', mode) }, [mode])
+  useEffect(() => { localStorage.setItem('pn-read', readPref ? '1' : '') }, [readPref])
   useEffect(() => { if (!phone()) localStorage.setItem('pn-panel', panel) }, [panel])
 
   const save = useCallback(async (): Promise<void> => {
@@ -122,7 +126,7 @@ const NoteView = forwardRef<NoteViewHandle, { id: number; onBack?: () => void; e
       if (!live) return
       setStatus('saved')
       cur.current = { id, etag: n.etag, saved: n.content || '', draft: n.content || '', saving: false, again: false, timer: 0 }
-      setNote(n); setTitle(n.title); setDraft(n.content || ''); setRevision(r => r + 1)
+      setNote(n); setTitle(n.title); setDraft(n.content || ''); setBlank(!(n.content || '').trim()); setRevision(r => r + 1)
       if (n.path.toLowerCase().endsWith('.txt')) setMode('markdown')
     }).catch(e => live && setErr((e as Error).message))
     return () => { live = false }
@@ -419,24 +423,32 @@ const NoteView = forwardRef<NoteViewHandle, { id: number; onBack?: () => void; e
     { label: 'Delete…', icon: 'trash', danger: true, onSelect: () => setSheet({ kind: 'delete' }) },
   ]
 
+  const reading = readPref && !blank && !note.readonly
+  const toggleReading = () => {
+    const p = rich.current?.flush(); if (p != null) changed(p)
+    if (reading) setReadPref(false); else { setReadPref(true); setBlank(false) }
+  }
+  const locked = note.readonly || reading
+
   const outline = headings(draft)
   const words = wordCount(draft)
   const statusText: Record<Status, string> = { saved: 'Saved', dirty: 'Editing…', saving: 'Saving…', error: 'Not saved — retrying', conflict: 'Changed elsewhere', offline: 'Offline — retrying' }
 
   return (
-    <div className={`note-view ${panel ? 'with-panel' : ''} ${embedded ? 'embedded' : ''}`}>
+    <div className={`note-view ${panel ? 'with-panel' : ''} ${embedded ? 'embedded' : ''} ${reading ? 'reading' : ''}`}>
       <header className="note-head">
         {onBack && <button type="button" className="btn ghost icon-only back-btn" onClick={onBack} aria-label="Back to the list"><Icon name="chevron-left" size={20} /></button>}
         <div className="note-title-wrap">
           <div className="note-crumbs">
             <Link to={`/?in=${encodeURIComponent(note.category)}`}><Icon name="folder" size={12} />{note.category ? note.category.split('/').join(' › ') : 'Notes'}</Link>
           </div>
-          <input className="note-title" value={title} onChange={e => setTitle(e.target.value)} onBlur={rename} onKeyDown={e => { if (e.key === 'Enter') { (e.target as HTMLInputElement).blur() } if (e.key === 'Escape') { setTitle(note.title); (e.target as HTMLInputElement).blur() } }} readOnly={note.readonly} aria-label="Title" />
+          <input className="note-title" value={title} onChange={e => setTitle(e.target.value)} onBlur={rename} onKeyDown={e => { if (e.key === 'Enter') { (e.target as HTMLInputElement).blur() } if (e.key === 'Escape') { setTitle(note.title); (e.target as HTMLInputElement).blur() } }} readOnly={locked} aria-label="Title" />
         </div>
         <div className="note-actions">
           <span className={`save-state ${status}`} title={stamp(note.modified)}>{statusText[status]}</span>
           <button type="button" className={`btn ghost icon-only wide-only ${note.favorite ? 'on star' : ''}`} title={note.favorite ? 'Remove from favourites' : 'Favourite'} aria-label={note.favorite ? 'Remove from favourites' : 'Favourite'} aria-pressed={note.favorite} onClick={() => patch({ favorite: !note.favorite })}><Icon name="star" size={17} /></button>
           <button type="button" className={`btn ghost icon-only wide-only ${note.pinned ? 'on' : ''}`} title={note.pinned ? 'Unpin' : 'Pin to the top'} aria-label={note.pinned ? 'Unpin' : 'Pin to the top'} aria-pressed={note.pinned} onClick={() => patch({ pinned: !note.pinned })}><Icon name="pushpin" size={17} /></button>
+          {!note.readonly && <button type="button" className={`btn ghost icon-only reader-btn ${reading ? 'on' : ''}`} title={reading ? 'Back to editing' : 'Reader mode'} aria-label="Reader mode" aria-pressed={reading} onClick={toggleReading}><Icon name="book-open" size={17} /></button>}
           <Segmented size="sm" className="mode-toggle" label="Editor" value={mode} onChange={m => { const p = rich.current?.flush(); if (p != null) changed(p); setMode(m); setRevision(r => r + 1) }}
             options={[{ value: 'rich' as const, label: 'Aa', title: 'Rich text' }, { value: 'markdown' as const, label: 'M↓', title: 'Markdown source' }]} />
           <button type="button" className={`btn ghost icon-only wide-only ${panel ? 'on' : ''}`} title="Outline, links and info" aria-label="Outline, links and info" aria-pressed={!!panel} onClick={() => setPanel(p => p ? '' : 'outline')}><Icon name="panel-right" size={17} /></button>
@@ -459,15 +471,15 @@ const NoteView = forwardRef<NoteViewHandle, { id: number; onBack?: () => void; e
         </div>
       </div>}
 
-      {mode === 'markdown' && <MdToolbar ed={md} onTool={t => runTool(t, currentLine())} onAttach={s => onMessage({ name: 'attach', source: s })} onTemplates={() => setSheet({ kind: 'templates' })} tools={offered} />}
+      {mode === 'markdown' && !locked && <MdToolbar ed={md} onTool={t => runTool(t, currentLine())} onAttach={s => onMessage({ name: 'attach', source: s })} onTemplates={() => setSheet({ kind: 'templates' })} tools={offered} />}
 
       <div className="note-body">
         <div className="editor-pane">
           {mode === 'rich'
-            ? <RichEditor ref={rich} docKey={String(note.id)} revision={revision} content={draft} noteID={note.id} readonly={note.readonly} checkable tools={offered} theme={theme}
+            ? <RichEditor ref={rich} docKey={String(note.id)} revision={revision} content={draft} noteID={note.id} readonly={locked} reader={reading} checkable tools={offered} theme={theme}
                 spellcheck={settings?.spellcheck} placeholder="Write, or type / for blocks and homelab tools" onChange={changed} onMessage={onMessage} onRequest={onRequest}
                 onFailed={msg => { toast(`The rich editor could not open this note (${msg}); showing Markdown.`, 'err'); setMode('markdown') }} />
-            : <MarkdownEditor ref={md} docKey={String(note.id)} revision={revision} content={draft} readonly={note.readonly} spellcheck={settings?.spellcheck} onChange={changed} onPasteFiles={uploadFiles} onOpenLink={u => openLink(u)} onPeople={findPeople} />}
+            : <MarkdownEditor ref={md} docKey={String(note.id)} revision={revision} content={draft} readonly={locked} spellcheck={settings?.spellcheck} onChange={changed} onPasteFiles={uploadFiles} onOpenLink={u => openLink(u)} onPeople={findPeople} />}
         </div>
         {panel && <div className="panel-scrim" onClick={() => setPanel('')} />}
         {panel && <aside className="note-panel">

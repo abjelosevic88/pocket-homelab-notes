@@ -54,6 +54,11 @@ body.phone .milkdown .ProseMirror table { display: block; max-width: 100%; overf
 body.phone .milkdown-block-handle { display: none !important; }
 /* The desktop workspace fills its resizable note pane; keep room for block controls. */
 body.desktop:not(.compact) .milkdown .ProseMirror { box-sizing: border-box; width: 100%; max-width: none; padding: 24px 32px 60px 48px; min-height: 100vh; }
+/* Reader mode: the note set out for reading — a measure that is easy on the eye, a little more
+   air between lines, and none of the editing handles. */
+body.reader .milkdown .ProseMirror { font-size: 1.06em; line-height: 1.7; }
+body.reader.desktop:not(.compact) .milkdown .ProseMirror { max-width: 46rem; margin: 0 auto; padding: 28px 32px 80px 32px; }
+body.reader .milkdown-block-handle, body.reader .milkdown-slash-menu, body.reader .milkdown-toolbar { display: none !important; }
 /* Crepe adds a zero-height widget and its virtual cursor before the first block, so :first-child alone
    never matched: the first real block is the one with no non-widget sibling before it. */
 .milkdown .ProseMirror > :not(.ProseMirror-widget, .prosemirror-virtual-cursor):not(:not(.ProseMirror-widget, .prosemirror-virtual-cursor) ~ *) { margin-top: 0; }

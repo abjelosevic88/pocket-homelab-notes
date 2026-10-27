@@ -44,6 +44,8 @@ interface Props {
   noteID?: number
   share?: string
   readonly?: boolean
+  /** Reader mode: the note read-only, set out for reading. */
+  reader?: boolean
   checkable?: boolean
   focus?: boolean
   tools?: string[]
@@ -88,19 +90,40 @@ export const RichEditor = forwardRef<RichEditorHandle, Props>(function RichEdito
     return () => { delete host.__noteHost; delete host.__noteHostRequest }
   }, [])
 
+  // What scrolls in the frame: the page, or the editor under the desktop command bar.
+  const scroller = (): Element | null => {
+    const doc = frame.current?.contentDocument
+    if (!doc) return null
+    const ed = doc.getElementById('editor')
+    return ed && ed.scrollHeight > ed.clientHeight && getComputedStyle(ed).overflowY === 'auto' ? ed : doc.scrollingElement
+  }
+
   const load = () => {
     const ed = api()
     if (!ed) return
     const p = latest.current
+    // The same note again (a reload, reader mode on or off): it stays where it was read to,
+    // as a share of its length, since reader mode sets the text wider apart.
+    const was = scroller()
+    const at = loaded.current?.doc === p.docKey && was && was.scrollTop > 0 ? was.scrollTop / Math.max(1, was.scrollHeight - was.clientHeight) : 0
     loaded.current = { doc: p.docKey, revision: p.revision }
     const accent = getComputedStyle(document.documentElement).getPropertyValue('--accent').trim()
     ed.load(p.content, {
       document: p.docKey, noteID: p.noteID ?? null, share: p.share ?? null, desktop: window.innerWidth > 760, compact: false,
-      tools: p.tools ?? [], readonly: !!p.readonly, checkable: !!p.checkable, focus: !!p.focus, accent, theme: p.theme,
+      tools: p.tools ?? [], readonly: !!p.readonly, reader: !!p.reader, checkable: !!p.checkable, focus: !!p.focus, accent, theme: p.theme,
       spellcheck: p.spellcheck !== false, placeholder: p.placeholder,
     }).then(() => {
       // A real keyboard: the editor's toolbar follows its focus.
       ed.setKeyboard(false, true)
+      if (!at) return
+      // The note is drawn a few frames after it loads: back to the place once it is there.
+      const until = Date.now() + 1500
+      const back = () => {
+        const el = scroller()
+        if (el && el.scrollHeight > el.clientHeight) el.scrollTop = at * (el.scrollHeight - el.clientHeight)
+        else if (Date.now() < until) requestAnimationFrame(back)
+      }
+      back()
     })
   }
 
@@ -109,6 +132,14 @@ export const RichEditor = forwardRef<RichEditorHandle, Props>(function RichEdito
     const l = loaded.current
     if (!l || l.doc !== props.docKey || l.revision !== props.revision) load()
   }, [ready, props.docKey, props.revision]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Reader mode on or off: the same note again, editable or not.
+  const mode = useRef({ readonly: props.readonly, reader: props.reader })
+  useEffect(() => {
+    const m = mode.current
+    mode.current = { readonly: props.readonly, reader: props.reader }
+    if (ready && loaded.current && (m.readonly !== props.readonly || m.reader !== props.reader)) load()
+  }, [props.readonly, props.reader]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // Theme changes reach the frame without reloading the note.
   useEffect(() => {
