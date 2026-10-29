@@ -178,7 +178,7 @@ body.reader .milkdown-block-handle, body.reader .milkdown-slash-menu, body.reade
 .milkdown .milkdown-image-block img { border-radius: 8px; max-width: 100%; }
 /* A drawing from Pocket Draw (shown through the app): on white, so dark lines read in the dark
    theme too, and a click opens it in Draw. */
-.milkdown img[src*="/draw/"][src$="/picture.svg"] { background: #fff; cursor: pointer; }
+.milkdown img[src*="/draw/"][src$="/picture.svg"] { background: #fff; cursor: pointer; max-height: 70vh; width: auto; max-width: 100%; object-fit: contain; }
 .milkdown .milkdown-image-block .image-edit, .milkdown .milkdown-image-inline .empty-image-inline { background: var(--fill); border-radius: 10px; }
 
 /* A section that folds away */
