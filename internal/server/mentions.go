@@ -14,7 +14,7 @@ import (
 // episode, a trip is its page's address, and a note is about it when it links
 // there. Another Pocket app asks GET /api/v1/mentions?url=… (Core link scope
 // notes:read) to show "Notes about this" on its own page, and sends people to
-// /new?url=… to start one.
+// /new?url=… to start one (the page there asks POST /api/v1/notes/from).
 
 var noteURLRe = regexp.MustCompile(`https?://[^\s<>()\[\]"'` + "`" + `]+`)
 
@@ -84,4 +84,70 @@ func (s *Server) handleMentions(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	writeJSON(w, http.StatusOK, out)
+}
+
+// aboutContent is the start of a note about a thing: its title, then a link
+// to the thing's page, or with image set, the thing shown as a picture (a
+// drawing in Pocket Draw: `![Plan](…/d/12/picture.svg "Plan")`), then a
+// line of text if there is one.
+func aboutContent(title, target, label, text string, image bool) string {
+	var thing string
+	if image {
+		clean := func(v string) string {
+			return strings.Join(strings.Fields(strings.NewReplacer("[", "", "]", "", `"`, "", "(", "", ")", "").Replace(v)), " ")
+		}
+		label = firstNonEmpty(clean(label), clean(title), "Picture")
+		thing = "![" + label + "](" + escapeTarget(target) + ` "` + label + `")`
+	} else {
+		thing = "[" + strings.NewReplacer("[", `\[`, "]", `\]`).Replace(label) + "](" + escapeTarget(target) + ")"
+	}
+	content := "# " + title + "\n\n" + thing + "\n\n"
+	if text != "" {
+		content += text + "\n\n"
+	}
+	return content
+}
+
+// escapeTarget keeps parentheses and spaces from ending a Markdown address early.
+func escapeTarget(target string) string {
+	return strings.NewReplacer("(", "%28", ")", "%29", " ", "%20", "\t", "%20", "\n", "%20", "\r", "%20").Replace(target)
+}
+
+// handleNoteFrom makes the note /new?title=&url=&label=&folder=&text=&image=
+// asks for (docs/notes-from-apps.md), in the person's folder for new notes
+// unless a folder is given.
+func (s *Server) handleNoteFrom(w http.ResponseWriter, r *http.Request) {
+	ctx, uid := r.Context(), me(r)
+	var in struct {
+		Title  string  `json:"title"`
+		URL    string  `json:"url"`
+		Label  string  `json:"label"`
+		Folder *string `json:"folder"`
+		Text   string  `json:"text"`
+		Image  bool    `json:"image"`
+	}
+	if err := decode(r, &in); err != nil {
+		writeErr(w, http.StatusBadRequest, "invalid json")
+		return
+	}
+	target := strings.TrimSpace(in.URL)
+	if itemKey(target) == "" {
+		writeErr(w, http.StatusBadRequest, "This link has no web address to write the note about.")
+		return
+	}
+	title := firstNonEmpty(strings.Join(strings.Fields(in.Title), " "), "Untitled")
+	label := firstNonEmpty(strings.TrimSpace(in.Label), title)
+	folder := ""
+	if in.Folder != nil {
+		folder = *in.Folder
+	} else if st, err := s.store.GetSettings(ctx, uid); err == nil {
+		folder = st.DefaultFolder
+	}
+	content := aboutContent(title, target, label, strings.TrimSpace(in.Text), in.Image)
+	n, err := s.createNote(ctx, uid, NoteInput{Title: &title, Category: &folder, Content: &content}, source(r))
+	if err != nil {
+		s.fail(w, err, "create note")
+		return
+	}
+	writeJSON(w, http.StatusCreated, n)
 }

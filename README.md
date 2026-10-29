@@ -72,7 +72,10 @@ Notes apps and the Pocket Homelab app work against it too.
 
 **Homelab tools** in the `/` menu (each shown when its service is connected)
 - *Link to something*: Nextcloud files (full-text), people in Pocket Contacts, Pocket Documents (full text and
-  OCR), Forgejo issues and pull requests, Jellyfin titles, Immich photos — the note gets a link, not a copy.
+  OCR), books in Pocket Bookshelf, podcast episodes, drawings in Pocket Draw, Forgejo issues and pull requests,
+  Jellyfin titles, Immich photos — the note gets a link, not a copy (a drawing is shown as its picture).
+- *Drawing*: a sketch or diagram from Pocket Draw, shown in the note as its picture (and kept up to date);
+  click it to open it in Draw. *New sketch* / *New text diagram* start one in Draw from the note.
 - *@ and a name* while typing: the people in Pocket Contacts whose names match; the one picked becomes a link to
   their page there, which lists the note.
 - *From Photos* (Immich, smart search) and *From Nextcloud*: put pictures and files into a note.

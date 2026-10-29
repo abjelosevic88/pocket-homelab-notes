@@ -51,7 +51,7 @@ var serviceNames = map[string]string{
 	"jellystat": "Jellystat", "audiobookshelf": "Audiobookshelf", "kuma": "Uptime Kuma", "scrutiny": "Scrutiny", "backrest": "Backrest",
 	"adguard": "AdGuard Home", "glances": "Glances", "beszel": "Beszel",
 	"habits": "Pocket Habits", "money": "Pocket Money", "garage": "Pocket Garage", "podcasts": "Pocket Podcasts", "documents": "Pocket Documents", "bookshelf": "Pocket Bookshelf",
-	"contacts": "Pocket Contacts", "files": "Pocket Files",
+	"contacts": "Pocket Contacts", "files": "Pocket Files", "draw": "Pocket Draw",
 }
 
 // directFields says what a typed-in connection asks for: the key's label and
@@ -63,7 +63,7 @@ var directFields = map[string][2]string{
 	"kuma": {"API key (optional)", "Status page slug"}, "scrutiny": {"", ""}, "backrest": {"Password", "Username"}, "adguard": {"Password", "Username"},
 	"glances": {"", ""}, "beszel": {"Password", "Email"},
 	"habits": {"API token", ""}, "money": {"API token", ""}, "garage": {"API token", ""}, "podcasts": {"API token", ""}, "documents": {"API token", ""}, "bookshelf": {"API token", ""},
-	"contacts": {"API token", ""},
+	"contacts": {"API token", ""}, "draw": {"API token", ""},
 }
 
 // errNotConnected is a tool asked for a service the person has not connected.
@@ -330,6 +330,11 @@ func (s *Server) toolRoutes(r chi.Router) {
 	r.Post("/tools/photos/attach", s.handleToolPhotosAttach)
 	r.Get("/tools/files", s.handleToolFiles)
 	r.Post("/tools/files/attach", s.handleToolFilesAttach)
+	// Drawings from Pocket Draw, shown in the note (tools_draw.go).
+	r.Get("/tools/draw", s.handleToolDraw)
+	r.Post("/tools/draw", s.handleToolDrawCreate)
+	r.Get("/tools/addresses", s.handleToolAddresses)
+	r.Get("/draw/{id}/picture.svg", s.handleDrawPicture)
 	// Blocks written from what the services know (tools_reports.go).
 	r.Post("/tools/report/{kind}", s.handleToolReport)
 	// A line sent away: a task, a card, a transaction (tools_actions.go).
@@ -514,7 +519,7 @@ func (s *Server) handleTestIntegration(w http.ResponseWriter, r *http.Request) {
 // toolNeeds says what each editor tool needs: any one of the listed
 // services ("svc:x") or apps ("app:x") connected.
 var toolNeeds = map[string][]string{
-	"link":      {"svc:nextcloud", "app:contacts", "app:documents", "app:bookshelf", "app:podcasts", "svc:forgejo", "svc:jellyfin", "svc:immich"},
+	"link":      {"svc:nextcloud", "app:contacts", "app:documents", "app:bookshelf", "app:podcasts", "app:draw", "svc:forgejo", "svc:jellyfin", "svc:immich"},
 	"photos":    {"svc:immich"},
 	"files":     {"svc:nextcloud"},
 	"bookmark":  {},
@@ -529,6 +534,7 @@ var toolNeeds = map[string][]string{
 	"task":      {"svc:nextcloud"},
 	"expense":   {"app:money"},
 	"contacts":  {"app:contacts"}, // people offered after @ in the editor
+	"draw":      {"app:draw"},
 }
 
 // connected reports whether a person can reach a service ("svc") or app

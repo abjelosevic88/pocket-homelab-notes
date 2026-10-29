@@ -1,6 +1,7 @@
 // Tools no general editor has: the homelab around the note. A snapshot of how the server
 // stands, a line sent to Nextcloud Tasks or Deck, a link to a file, document, issue or title
-// found with the app's own search, a web bookmark with the page's title, a scan or photo
+// found with the app's own search, a drawing from Pocket Draw shown as its picture, a web
+// bookmark with the page's title, a scan or photo
 // from the phone's camera, a voice memo. The editor page has no network and knows none of
 // the services: every tool asks the app, which answers with what to put into the note.
 //
@@ -17,6 +18,7 @@ export const icons = {
   task: svg('<rect x="4" y="4" width="16" height="16" rx="3"/><path d="M8 12.5l2.5 2.5L16 9.5"/>'),
   link: svg('<path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1"/><path d="M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1"/><path d="M3 21l3-3"/>'),
   bookmark: svg('<path d="M6 4h12v17l-6-4-6 4z"/>'),
+  drawing: svg('<path d="M3 17c3-1 4-5 7-5s2 4 5 4"/><path d="M14.5 4.5a2.12 2.12 0 0 1 3 3L10 15l-3.5 1 1-3.5z"/><path d="M3 21h18"/>'),
   scan: svg('<path d="M4 8V6a2 2 0 0 1 2-2h2M16 4h2a2 2 0 0 1 2 2v2M20 16v2a2 2 0 0 1-2 2h-2M8 20H6a2 2 0 0 1-2-2v-2"/><path d="M7 12h10"/>'),
   camera: svg('<path d="M4 8h3l2-3h6l2 3h3v11H4z"/><circle cx="12" cy="13" r="3.5"/>'),
   voice: svg('<rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3M9 21h6"/>'),
@@ -103,6 +105,7 @@ export const entries = [
   ['snapshot', { title: 'Homelab snapshot', label: 'Homelab snapshot status server now incident', description: 'How the server, storage, monitors and downloads stand right now, as a table', icon: icons.snapshot, onRun: simple('snapshot') }],
   ['task', { title: 'Make this line a task', label: 'Make this line a task todo deck card send', description: 'Sends the line above to Nextcloud Tasks or Deck and leaves a link behind', icon: icons.task, onRun: taskItem }],
   ['link', { title: 'Link to something', label: 'Link to something person people contact file document book episode issue pull request movie series pocket contacts documents forgejo jellyfin nextcloud', description: 'A person, file, document, issue or title, found with the app’s search', icon: icons.link, onRun: simple('link') }],
+  ['draw', { title: 'Drawing', label: 'Drawing sketch diagram draw picture flowchart mermaid excalidraw drawio pocket draw', description: 'A sketch or diagram from Pocket Draw, shown in the note', icon: icons.drawing, onRun: simple('draw') }],
   ['bookmark', { title: 'Web bookmark', label: 'Web bookmark url address website page', description: 'An address becomes a link with the page’s title', icon: icons.bookmark, onRun: simple('bookmark') }],
   ['scan', { title: 'Scan a document', label: 'Scan a document camera pages pdf paper', description: 'The camera scans pages into a PDF stored with the note', icon: icons.scan, onRun: simple('scan') }],
   ['camera', { title: 'Take a photo', label: 'Take a photo camera picture', description: 'A picture taken now, stored with the note', icon: icons.camera, onRun: simple('camera') }],

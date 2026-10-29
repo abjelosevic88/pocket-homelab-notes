@@ -3,7 +3,7 @@
 // for the app's attachments folder; Nextcloud Notes reads upwards as far as the notes folder). The page has no
 // network, so the app serves their bytes under a scheme of its own, and takes uploads.
 
-export const state = { noteID: null, share: null }
+export const state = { noteID: null, share: null, draw: null }
 
 const isStoredWithNote = (target) => {
   const t = String(target || '').trim()
@@ -16,9 +16,37 @@ const isStoredWithNote = (target) => {
   return up < parts.length && !parts.slice(up).includes('..')
 }
 
-// What the page loads for an image in the note. Anything that is not a file of this note is
-// left as it is (and an address out on the network is then refused by the page's rules).
+// A drawing from Pocket Draw is in the note as its picture there, `{draw}/d/12/picture.svg`, below
+// the drawing's page `{draw}/d/12`. Draw wants its own sign-in for it, so the page shows it
+// through the app, fetched as the person (and on a shared note's page, as the one who shared it);
+// the note keeps Draw's address. Draw's address comes with the note; while it is not known, such
+// an address on any host counts.
+const drawPicture = /\/d\/(\d+)\/picture\.svg$/
+export function drawingIn(src) {
+  let u
+  try { u = new URL(String(src || '')) } catch (e) { return null }
+  if (u.protocol !== 'http:' && u.protocol !== 'https:') { return null }
+  const m = drawPicture.exec(u.pathname)
+  if (!m) { return null }
+  if (state.draw) {
+    try { if (new URL(state.draw).host.toLowerCase() !== u.host.toLowerCase()) { return null } } catch (e) {}
+  }
+  return { id: m[1], page: u.origin + u.pathname.replace(/\/picture\.svg$/, '') }
+}
+
+// The drawing's page for a picture on screen (by the address the page loads), to open on a click.
+const drawPages = new Map()
+export const drawingPage = (shown) => drawPages.get(shown) || null
+
+// What the page loads for an image in the note. Anything that is not a file of this note (or a
+// drawing) is left as it is (and an address out on the network is then refused by the page's rules).
 export function displayURL(src) {
+  const drawing = drawingIn(src)
+  if (drawing) {
+    const shown = state.share ? '/api/public/share/' + encodeURIComponent(state.share) + '/draw/' + drawing.id + '/picture.svg' : '/api/v1/draw/' + drawing.id + '/picture.svg'
+    drawPages.set(shown, drawing.page)
+    return shown
+  }
   if (!isStoredWithNote(src) || (state.noteID == null && !state.share)) { return src }
   let path = src
   try { path = decodeURIComponent(src) } catch (e) {}

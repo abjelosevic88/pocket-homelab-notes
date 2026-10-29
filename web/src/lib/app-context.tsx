@@ -14,6 +14,8 @@ interface AppState {
   folders: Folder[]
   tags: TagCount[]
   tools: Tools
+  /** Where people open the Pocket apps whose things a note shows (`draw`: Pocket Draw). */
+  addresses: Record<string, string>
   sync: SyncStatus | null
   /** Changes whenever notes were added, renamed, moved or deleted: lists reload on it. */
   version: number
@@ -41,6 +43,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const [folders, setFolders] = useState<Folder[]>([])
   const [tags, setTags] = useState<TagCount[]>([])
   const [tools, setTools] = useState<Tools>({})
+  const [addresses, setAddresses] = useState<Record<string, string>>({})
   const [sync, setSync] = useState<SyncStatus | null>(null)
   const [version, setVersion] = useState(0)
   // The theme follows the system unless one is chosen (pn-theme holds the choice; the shared-note
@@ -62,8 +65,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => { if (settings?.title) document.title = settings.title }, [settings?.title])
 
   const reloadMeta = useCallback(async () => {
-    const [u, t] = await Promise.all([api.get<User[]>(`${V1}/users`), api.get<Tools>(`${V1}/tools`).catch(() => ({}))])
-    setUsers(u); setTools(t)
+    const [u, t, a] = await Promise.all([api.get<User[]>(`${V1}/users`), api.get<Tools>(`${V1}/tools`).catch(() => ({})), api.get<Record<string, string>>(`${V1}/tools/addresses`).catch(() => ({}))])
+    setUsers(u); setTools(t); setAddresses(a)
   }, [])
 
   const reloadTree = useCallback(async () => {
@@ -125,5 +128,5 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     return () => { clearInterval(t); document.removeEventListener('visibilitychange', onShow); window.removeEventListener('focus', onShow) }
   }, [user, bump])
 
-  return <Ctx.Provider value={{ status, user, settings, users, folders, tags, tools, sync, version, bump, themeMode, theme, setThemeMode, toggleTheme: () => setThemeMode(theme === 'dark' ? 'light' : 'dark'), refresh, reloadMeta, reloadTree, setUser, setSettings }}>{children}</Ctx.Provider>
+  return <Ctx.Provider value={{ status, user, settings, users, folders, tags, tools, addresses, sync, version, bump, themeMode, theme, setThemeMode, toggleTheme: () => setThemeMode(theme === 'dark' ? 'light' : 'dark'), refresh, reloadMeta, reloadTree, setUser, setSettings }}>{children}</Ctx.Provider>
 }

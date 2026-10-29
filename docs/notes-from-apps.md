@@ -1,7 +1,7 @@
 # Notes about things in other apps
 
 A book in Pocket Bookshelf, an episode in Pocket Podcasts, a trip in Pocket Travel, a person in
-Pocket Contacts: the notes
+Pocket Contacts, a drawing in Pocket Draw: the notes
 about it are ordinary notes in Pocket Notes. A note is *about* a thing when it **links to the
 thing's page** in its app. Nothing else is stored anywhere: no notes field in each app, no
 table of attachments. The link is the relation, it reads well in any Markdown editor, and it
@@ -27,6 +27,32 @@ the person's page, which lists the note in its Notes box; Escape, or nothing mat
 `@` as typed. `@today` and the other dates work as before. With Contacts switched off in Settings
 → Integrations (or no link in Core) the list never asks and `@` is plain text.
 
+## Drawings from Pocket Draw
+
+A sketch or diagram from Pocket Draw is shown *in* the note, as its picture, rather than linked.
+**Drawing** in the `/` menu (or Homelab ▾ → Drawing… in Markdown mode, or a drawing picked in Link
+to something) puts in
+
+```
+![Kitchen plan](https://draw.example.com/d/12/picture.svg "Kitchen plan")
+```
+
+Draw's picture of drawing 12, which sits below the drawing's page `https://draw.example.com/d/12`,
+so the rule above makes the note one *about* the drawing: Draw asks
+`GET /api/v1/mentions?url=https://draw.example.com/d/12` for its Notes box. The picker also starts
+a new sketch or text diagram in Draw (`POST /api/v1/tools/draw {kind, title}`), puts it in the note
+and opens it in a new tab to be drawn.
+
+Draw's picture needs a sign-in there, so the editor shows it through Notes:
+`GET /api/v1/draw/12/picture.svg` fetches Draw's `GET /api/v1/drawings/12/preview.svg` with the
+person's Core link (`drawings:read`; starting one needs `drawings:write`) and serves it as a locked
+down SVG (no script, nothing fetched from elsewhere), kept for 30 seconds, so the note shows the
+drawing as it is now. Not connected, switched off, or no picture yet: a grey card says so instead.
+A shared note's page shows the drawings that note holds, fetched as the person who shared it
+(`/api/public/share/{token}/draw/12/picture.svg`). The Markdown keeps Draw's address; clicking the
+picture opens the drawing in Draw. Draw starts a note about a drawing with
+`/new?title=Kitchen plan&url=https://draw…/d/12/picture.svg&label=Kitchen plan&image=1`.
+
 ## The two calls
 
 **Which notes are about this?** — as the person, through Pocket Core:
@@ -50,7 +76,11 @@ matter. Only that person's notes are searched. Up to 20 `url=` at once.
 
 It makes `# Dune`, then `[📖 Dune — Frank Herbert](https://bookshelf…/books/12)`, in the folder
 (default: the person's folder for new notes), and opens it. `text=` adds a line under the link.
-Signed out, it signs in first and carries on.
+`image=1` shows the thing as a picture instead of linking to it: `url=` is then the picture's
+address, and the note gets `![label](url "label")` (brackets, quotes and parentheses left out of
+the label). Signed out, it signs in first and carries on. The page has the server write the note
+(`POST /api/v1/notes/from {title, url, label, folder?, text, image}`), so the rules are the same
+from anywhere.
 
 The token from Core (`ActAs` in the SDK) also carries `public_url`, Notes' address for people;
 `url` is the one for servers.

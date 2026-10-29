@@ -321,7 +321,7 @@ function Integrations() {
   if (!data) return <Loading />
   const groups: [string, string, Integration[]][] = [
     ['Services', 'Links to files, documents and issues, photos, the homelab snapshot, the week’s viewing.', data.items.filter(i => i.kind === 'svc')],
-    ['Pocket apps', 'Spending, the car’s log, habits, people, books and podcast episodes.', data.items.filter(i => i.kind === 'app')],
+    ['Pocket apps', 'Spending, the car’s log, habits, people, books, podcast episodes and drawings.', data.items.filter(i => i.kind === 'app')],
   ]
   return (
     <div className="stack loose">

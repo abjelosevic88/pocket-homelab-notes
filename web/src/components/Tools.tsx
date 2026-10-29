@@ -22,7 +22,7 @@ export function toolError(e: unknown): string {
 interface LinkItem { id: string; title: string; detail: string; url: string; icon: string; markdown: string; photo?: string; initials?: string; color?: string }
 interface LinkAnswer { sections: { source: string; title: string; items: LinkItem[] }[]; errors?: Record<string, string>; note?: string }
 
-const ICONS: Record<string, string> = { person: 'user', file: 'file', folder: 'folder', document: 'receipt', book: 'book', podcast: 'headphones', moment: 'timer', issue: 'dot-circle', pull: 'git-pull', movie: 'film', series: 'tv', episode: 'tv', photo: 'image', link: 'link' }
+const ICONS: Record<string, string> = { drawing: 'drawing', person: 'user', file: 'file', folder: 'folder', document: 'receipt', book: 'book', podcast: 'headphones', moment: 'timer', issue: 'dot-circle', pull: 'git-pull', movie: 'film', series: 'tv', episode: 'tv', photo: 'image', link: 'link' }
 
 export function LinkPicker({ onPick, onClose }: { onPick: (md: string) => void; onClose: () => void }) {
   const [q, setQ] = useState('')
@@ -40,7 +40,7 @@ export function LinkPicker({ onPick, onClose }: { onPick: (md: string) => void; 
   const sections = data?.sections?.filter(s => s.items.length) || []
   return (
     <Modal title="Link to something" onClose={onClose} size="lg">
-      <div className="tool-search"><Icon name="search" size={15} /><input autoFocus value={q} onChange={e => setQ(e.target.value)} placeholder="Search people, files, documents, books, episodes, issues, films, photos…" />{busy && <span className="spinner" />}</div>
+      <div className="tool-search"><Icon name="search" size={15} /><input autoFocus value={q} onChange={e => setQ(e.target.value)} placeholder="Search people, files, documents, books, episodes, drawings, issues, films, photos…" />{busy && <span className="spinner" />}</div>
       <div className="tool-results">
         {err && <div className="callout danger">{err}</div>}
         {!sections.length && !busy && !err && <p className="muted center pad">{q.trim().length < 2 ? 'Type a few letters. The note gets a link to what you pick, not a copy.' : `Nothing matches “${q}”.`}</p>}
@@ -151,6 +151,65 @@ export function PhotoPicker({ noteID, onPick, onClose }: { noteID: number; onPic
         <span className="spacer" />
         <button type="button" className="btn" onClick={onClose}>Cancel</button>
         <button type="button" className="btn primary" disabled={!picked.length || adding} onClick={add}>{adding ? 'Adding…' : picked.length ? `Add ${picked.length}` : 'Add'}</button>
+      </div>
+    </Modal>
+  )
+}
+
+// ---------------------------------------------------------------- drawing (Pocket Draw)
+
+interface Drawing { id: number; title: string; kind: string; detail: string; edited_at: string; picture: string; url: string; markdown: string }
+interface DrawAnswer { items: Drawing[]; connected: boolean; error?: string }
+
+/** A sketch or diagram from Pocket Draw, shown in the note as its picture; or a new one started
+ *  here, put in the note and opened in Draw to be drawn. */
+export function DrawPicker({ noteTitle, onPick, onClose }: { noteTitle?: string; onPick: (md: string) => void; onClose: () => void }) {
+  const [q, setQ] = useState('')
+  const dq = useDebounce(q, 300)
+  const [data, setData] = useState<DrawAnswer | null>(null)
+  const [busy, setBusy] = useState(false)
+  const [making, setMaking] = useState('')
+  const [err, setErr] = useState('')
+  useEffect(() => {
+    let live = true
+    setBusy(true)
+    api.get<DrawAnswer>(`${V1}/tools/draw${qs({ q: dq.trim() })}`).then(d => { if (live) setData(d) }).catch(e => { if (live) setErr(toolError(e)) }).finally(() => live && setBusy(false))
+    return () => { live = false }
+  }, [dq])
+  // The new drawing opens in a tab of its own. The tab is opened at the click, before Draw has
+  // answered: a browser lets a page open one only straight after a click.
+  const start = async (kind: 'sketch' | 'mermaid') => {
+    const tab = window.open('', '_blank')
+    if (tab) tab.opener = null
+    setMaking(kind); setErr('')
+    try {
+      const r = await api.post<{ id: number; title: string; url: string; markdown: string }>(`${V1}/tools/draw`, { kind, title: (kind === 'sketch' ? 'Sketch' : 'Diagram') + (noteTitle ? `: ${noteTitle}` : '') })
+      if (tab) tab.location.href = r.url; else window.open(r.url, '_blank', 'noopener')
+      onPick(r.markdown)
+    } catch (e) { tab?.close(); setErr(toolError(e)); setMaking('') }
+  }
+  const items = data?.items || []
+  const off = data && !data.connected
+  return (
+    <Modal title="Drawing" onClose={onClose} size="xl">
+      <div className="row wrap mb">
+        <div className="tool-search grow"><Icon name="search" size={15} /><input autoFocus value={q} onChange={e => setQ(e.target.value)} placeholder="Search your sketches and diagrams in Pocket Draw…" disabled={!!off} />{busy && <span className="spinner" />}</div>
+      </div>
+      {(err || data?.error) && <div className={`callout ${off ? 'warning' : 'danger'} mb`}>{err || data?.error}</div>}
+      <div className="draw-grid">
+        {items.map(d => (
+          <button type="button" key={d.id} className="draw-card" onClick={() => onPick(d.markdown)} title={`Put “${d.title}” in the note`}>
+            <span className="draw-thumb"><img loading="lazy" src={d.picture} alt="" /></span>
+            <span className="draw-meta"><b>{d.title}</b><small className="muted">{[d.detail, ago(d.edited_at)].filter(Boolean).join(' · ')}</small></span>
+          </button>
+        ))}
+      </div>
+      {data && !busy && !items.length && !data.error && <p className="muted center pad">{q.trim() ? `No drawing matches “${q}”.` : 'No drawings yet. Start one below.'}</p>}
+      <div className="modal-foot">
+        <button type="button" className="btn" disabled={!!off || !!making} onClick={() => start('sketch')}><Icon name="drawing" size={15} />{making === 'sketch' ? 'Starting…' : 'New sketch'}</button>
+        <button type="button" className="btn" disabled={!!off || !!making} onClick={() => start('mermaid')}><Icon name="code" size={15} />{making === 'mermaid' ? 'Starting…' : 'New text diagram'}</button>
+        <span className="spacer" />
+        <span className="muted small">The note shows the drawing and keeps up with changes to it.</span>
       </div>
     </Modal>
   )

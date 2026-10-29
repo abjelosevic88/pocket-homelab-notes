@@ -38,7 +38,7 @@ import { tableActions, tableSelectionTracker, setTableSelectionListener } from '
 import { codeMode } from './code-mode.js'
 import { remarkImageDefaults, imageBlockKeepsAlt } from './images.js'
 import { wikiLinks } from './wikilinks.js'
-import { state as attachments, displayURL, upload } from './attachments.js'
+import { state as attachments, displayURL, upload, drawingPage } from './attachments.js'
 import { contextMenu } from './context-menu.js'
 import { pasteSelectedLink, closeLinkForm } from './links.js'
 import { setTools, replaceLine, insertInline as putInline, lineAtCursor } from './homelab.js'
@@ -138,6 +138,7 @@ async function load(markdown, options) {
   if (options.accent) { document.documentElement.style.setProperty('--accent', options.accent) }
   if (options.theme) { document.documentElement.dataset.theme = options.theme }
   attachments.share = options.share || null
+  attachments.draw = options.draw || null
   document.body.spellcheck = options.spellcheck !== false
   document.body.classList.toggle('compact', !!options.compact)
   document.body.classList.toggle('reader', !!options.reader)
@@ -294,6 +295,11 @@ document.addEventListener('click', (event) => {
   if (!target) { return }
   const openButton = target.closest('.diagram-open')
   if (openButton) { event.preventDefault(); event.stopPropagation(); openDiagram(openButton); return }
+  // A drawing from Pocket Draw opens in Draw, to be looked at closely or drawn on, also while
+  // reading. Other pictures stay as they are: a click selects them, to resize or caption.
+  const picture = target.closest('img')
+  const drawing = picture && picture.closest('#editor') ? drawingPage(picture.getAttribute('src')) : null
+  if (drawing) { event.preventDefault(); event.stopPropagation(); post('link', { url: drawing, raw: drawing }); return }
   const view = crepe ? crepe.editor.action((ctx) => ctx.get(editorViewCtx)) : null
   const mark = target.closest('sup[data-type="footnote_reference"]')
   if (mark && view) {

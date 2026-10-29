@@ -32,6 +32,7 @@ var linkUses = []core.Use{
 	{App: "documents", Scopes: []string{"documents:read"}, Reason: "Find documents and link them in a note"},
 	{App: "bookshelf", Scopes: []string{"books:read"}, Reason: "Find your books and link them in a note"},
 	{App: "contacts", Scopes: []string{"contacts:read"}, Reason: "Link people in a note (type @ and a name), so the note shows on their page in Pocket Contacts"},
+	{App: "draw", Scopes: []string{"drawings:read", "drawings:write"}, Reason: "Show your sketches and diagrams from Pocket Draw inside a note, and start a new one from a note"},
 }
 
 type linkRoute struct {

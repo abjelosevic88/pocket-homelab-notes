@@ -9,7 +9,7 @@ import { Confirm, Loading, type MenuItem, MenuButton, Segmented, useToast } from
 import { Icon } from './icons'
 import { RichEditor, type EditorMessage, type RichEditorHandle } from './RichEditor'
 import { MarkdownEditor, type MarkdownEditorHandle } from './MarkdownEditor'
-import { BookmarkSheet, DiagramViewer, ExpenseSheet, FilesPicker, HabitsSheet, LinkPicker, PhotoPicker, TaskSheet, TemplatePicker, VoiceMemo, toolError } from './Tools'
+import { BookmarkSheet, DiagramViewer, DrawPicker, ExpenseSheet, FilesPicker, HabitsSheet, LinkPicker, PhotoPicker, TaskSheet, TemplatePicker, VoiceMemo, toolError } from './Tools'
 import { HistoryModal, MoveModal, ShareModal } from './NoteDialogs'
 import { exportHTML, printNote } from '../lib/export'
 import { copyText } from '../lib/clipboard'
@@ -18,7 +18,7 @@ import { AskButton } from './AskButton'
 
 type Status = 'saved' | 'dirty' | 'saving' | 'error' | 'conflict' | 'offline'
 type Sheet =
-  | { kind: 'link' } | { kind: 'bookmark' } | { kind: 'photos' } | { kind: 'files' } | { kind: 'habits' } | { kind: 'voice' } | { kind: 'templates' }
+  | { kind: 'link' } | { kind: 'bookmark' } | { kind: 'draw' } | { kind: 'photos' } | { kind: 'files' } | { kind: 'habits' } | { kind: 'voice' } | { kind: 'templates' }
   | { kind: 'task'; line: Line | null } | { kind: 'expense'; line: Line | null } | { kind: 'diagram'; svg: string }
   | { kind: 'history' } | { kind: 'share' } | { kind: 'move' } | { kind: 'delete' }
 type Line = { text: string; from?: number }
@@ -36,7 +36,7 @@ const noteIdIn = (url: string): number | null => {
 export interface NoteViewHandle { saveNow(): Promise<void>; reload(): Promise<void> }
 
 const NoteView = forwardRef<NoteViewHandle, { id: number; onBack?: () => void; embedded?: boolean }>(function NoteView({ id, onBack, embedded }, ref) {
-  const { settings, tools, theme, bump } = useApp()
+  const { settings, tools, addresses, theme, bump } = useApp()
   const { toast } = useToast()
   const navigate = useNavigate()
   const [note, setNote] = useState<Note | null>(null)
@@ -292,6 +292,7 @@ const NoteView = forwardRef<NoteViewHandle, { id: number; onBack?: () => void; e
     switch (tool) {
       case 'link': setSheet({ kind: 'link' }); break
       case 'bookmark': setSheet({ kind: 'bookmark' }); break
+      case 'draw': setSheet({ kind: 'draw' }); break
       case 'task': if (!line) { toast('Write the line first, then ask again on the line below it.', 'err'); return } setSheet({ kind: 'task', line }); break
       case 'expense': if (!line) { toast('Write the line first, then make it a transaction.', 'err'); return } setSheet({ kind: 'expense', line }); break
       case 'habits': setSheet({ kind: 'habits' }); break
@@ -476,7 +477,7 @@ const NoteView = forwardRef<NoteViewHandle, { id: number; onBack?: () => void; e
       <div className="note-body">
         <div className="editor-pane">
           {mode === 'rich'
-            ? <RichEditor ref={rich} docKey={String(note.id)} revision={revision} content={draft} noteID={note.id} readonly={locked} reader={reading} checkable tools={offered} theme={theme}
+            ? <RichEditor ref={rich} docKey={String(note.id)} revision={revision} content={draft} noteID={note.id} readonly={locked} reader={reading} checkable tools={offered} draw={addresses.draw} theme={theme}
                 spellcheck={settings?.spellcheck} placeholder="Write, or type / for blocks and homelab tools" onChange={changed} onMessage={onMessage} onRequest={onRequest}
                 onFailed={msg => { toast(`The rich editor could not open this note (${msg}); showing Markdown.`, 'err'); setMode('markdown') }} />
             : <MarkdownEditor ref={md} docKey={String(note.id)} revision={revision} content={draft} readonly={locked} spellcheck={settings?.spellcheck} onChange={changed} onPasteFiles={uploadFiles} onOpenLink={u => openLink(u)} onPeople={findPeople} />}
@@ -504,6 +505,7 @@ const NoteView = forwardRef<NoteViewHandle, { id: number; onBack?: () => void; e
       <input ref={cameraInput} type="file" accept="image/*" capture="environment" hidden onChange={async e => { const f = Array.from(e.target.files || []); e.target.value = ''; for (const m of await uploadFiles(f)) put(m, 'block') }} />
 
       {sheet?.kind === 'link' && <LinkPicker onClose={() => setSheet(null)} onPick={m => { setSheet(null); put(m, 'inline') }} />}
+      {sheet?.kind === 'draw' && <DrawPicker noteTitle={note.title} onClose={() => setSheet(null)} onPick={m => { setSheet(null); put(m, 'block') }} />}
       {sheet?.kind === 'bookmark' && <BookmarkSheet onClose={() => setSheet(null)} onPick={m => { setSheet(null); put(m, 'inline') }} />}
       {sheet?.kind === 'photos' && <PhotoPicker noteID={note.id} onClose={() => setSheet(null)} onPick={m => { setSheet(null); put(m, 'block') }} />}
       {sheet?.kind === 'files' && <FilesPicker noteID={note.id} onClose={() => setSheet(null)} onPick={m => { setSheet(null); put(m, 'block') }} />}
@@ -529,7 +531,7 @@ function phone() { return window.matchMedia('(max-width: 767px)').matches }
 function MdToolbar({ ed, onTool, onAttach, onTemplates, tools }: { ed: React.RefObject<MarkdownEditorHandle | null>; onTool: (t: string) => void; onAttach: (s: string) => void; onTemplates: () => void; tools: string[] }) {
   const b = (label: React.ReactNode, title: string, fn: () => void) => <button type="button" className="btn ghost sm" title={title} aria-label={title} onMouseDown={e => e.preventDefault()} onClick={fn}>{label}</button>
   const i = (name: string) => <Icon name={name} size={15} />
-  const items: [string, string, string][] = [['link', 'Link to something…', 'link'], ['bookmark', 'Web bookmark…', 'bookmark'], ['task', 'Make this line a task…', 'check-square'], ['expense', 'Make this line a transaction…', 'wallet'], ['snapshot', 'Homelab snapshot', 'server'], ['attention', 'What needs attention', 'alert'], ['media', 'Watched and listened this week', 'film'], ['spent', 'Spending this month', 'receipt'], ['fuel', 'Vehicle log', 'car'], ['hosts', 'Hosts on the network', 'globe'], ['processes', 'Server processes', 'activity'], ['habits', 'Days of habits…', 'habit'], ['voice', 'Voice memo…', 'mic'], ['camera', 'Take a photo…', 'camera']]
+  const items: [string, string, string][] = [['link', 'Link to something…', 'link'], ['draw', 'Drawing…', 'drawing'], ['bookmark', 'Web bookmark…', 'bookmark'], ['task', 'Make this line a task…', 'check-square'], ['expense', 'Make this line a transaction…', 'wallet'], ['snapshot', 'Homelab snapshot', 'server'], ['attention', 'What needs attention', 'alert'], ['media', 'Watched and listened this week', 'film'], ['spent', 'Spending this month', 'receipt'], ['fuel', 'Vehicle log', 'car'], ['hosts', 'Hosts on the network', 'globe'], ['processes', 'Server processes', 'activity'], ['habits', 'Days of habits…', 'habit'], ['voice', 'Voice memo…', 'mic'], ['camera', 'Take a photo…', 'camera']]
   const menu = (): MenuItem[] => { const l = items.filter(([k]) => tools.includes(k)); return l.length ? l.map(([k, label, icon]) => ({ label, icon, onSelect: () => onTool(k) })) : [{ label: 'Nothing is connected yet', disabled: true }] }
   return (
     <div className="md-toolbar">

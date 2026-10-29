@@ -52,7 +52,12 @@ Add `X-Pocket-Source: shortcut` (or `app`) to have your changes named so in a no
 `/tools/…` (link search, bookmark, people from Pocket Contacts for `@` — `GET /tools/contacts?q=` →
 `{enabled, contacts: [{id, name, detail, initials, color, photo, url, markdown}]}`, `enabled: false` when
 Contacts is off — and their pictures `GET /tools/contacts/{id}/photo?s=`, Immich photos, Nextcloud files,
-reports, task, expense).
+reports, task, expense). Drawings from Pocket Draw: `GET /tools/draw?q=` → `{connected, error?, items: [{id,
+title, kind, detail, edited_at, picture, url, markdown}]}` (`markdown` is the picture embed, `url` the
+drawing's page), `POST /tools/draw {kind: sketch|mermaid, title}` → `{id, title, url, markdown}`,
+`GET /draw/{id}/picture.svg` (the drawing's picture fetched from Draw as you, or a grey placeholder),
+`GET /tools/addresses` → `{draw: "https://draw…"}`. `POST /notes/from {title, url, label, folder?, text,
+image}` makes the note `/new?…` asks for ([notes-from-apps.md](notes-from-apps.md)).
 
 ## Shortcuts
 

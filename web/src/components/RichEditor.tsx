@@ -49,6 +49,8 @@ interface Props {
   checkable?: boolean
   focus?: boolean
   tools?: string[]
+  /** Pocket Draw's address: its pictures in the note are shown through this server. */
+  draw?: string
   theme: 'light' | 'dark'
   spellcheck?: boolean
   placeholder?: string
@@ -110,7 +112,7 @@ export const RichEditor = forwardRef<RichEditorHandle, Props>(function RichEdito
     const accent = getComputedStyle(document.documentElement).getPropertyValue('--accent').trim()
     ed.load(p.content, {
       document: p.docKey, noteID: p.noteID ?? null, share: p.share ?? null, desktop: window.innerWidth > 760, compact: false,
-      tools: p.tools ?? [], readonly: !!p.readonly, reader: !!p.reader, checkable: !!p.checkable, focus: !!p.focus, accent, theme: p.theme,
+      tools: p.tools ?? [], draw: p.draw ?? null, readonly: !!p.readonly, reader: !!p.reader, checkable: !!p.checkable, focus: !!p.focus, accent, theme: p.theme,
       spellcheck: p.spellcheck !== false, placeholder: p.placeholder,
     }).then(() => {
       // A real keyboard: the editor's toolbar follows its focus.

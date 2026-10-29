@@ -20,7 +20,8 @@ import (
 // Links to what lives elsewhere (Nextcloud files, people in Pocket Contacts,
 // Pocket Documents, books in Pocket Bookshelf, podcast episodes, Forgejo
 // issues, Jellyfin titles, Immich photos) and web bookmarks. The note gets a
-// link, not a copy.
+// link, not a copy. A drawing from Pocket Draw is the one exception: it is
+// shown in the note as its picture (tools_draw.go).
 
 // webLinkMarkdown is a Markdown link to an absolute address: brackets and line
 // breaks out of the text, spaces and parentheses escaped in the address.
@@ -66,6 +67,7 @@ var linkSources = []struct {
 	{"app", "documents", "Pocket Documents", linkDocuments},
 	{"app", "bookshelf", "Pocket Bookshelf", linkBooks},
 	{"app", "podcasts", "Pocket Podcasts", linkEpisodes},
+	{"app", "draw", "Pocket Draw", linkDrawings},
 	{"svc", "forgejo", "Forgejo", linkForgejo},
 	{"svc", "jellyfin", "Jellyfin", linkJellyfin},
 	{"svc", "immich", "Immich", linkImmich},

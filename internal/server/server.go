@@ -168,6 +168,7 @@ func (s *Server) Router() http.Handler {
 	r.Route("/api/public/share/{token}", func(r chi.Router) {
 		r.Get("/", s.handlePublicShare)
 		r.Get("/attachment", s.handlePublicShareAttachment)
+		r.Get("/draw/{id}/picture.svg", s.handlePublicShareDrawPicture)
 	})
 
 	// Nextcloud Notes' own API, so apps written for it (the Pocket Homelab app,
@@ -194,6 +195,7 @@ func (s *Server) Router() http.Handler {
 
 			r.Get("/notes", s.handleListNotes)
 			r.Post("/notes", s.handleCreateNote)
+			r.Post("/notes/from", s.handleNoteFrom)
 			r.Get("/notes/{id}", s.handleGetNote)
 			r.Put("/notes/{id}", s.handleUpdateNote)
 			r.Delete("/notes/{id}", s.handleDeleteNote)

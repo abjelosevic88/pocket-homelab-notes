@@ -5,9 +5,10 @@ import { useApp } from '../lib/app-context'
 import type { Note } from '../lib/types'
 import { Loading } from '../components/ui'
 
-// /new?title=…&url=…&label=…&folder=…&text=… — a note about something in another Pocket app
-// (docs/notes-from-apps.md): its first line is the title, then a link to the thing's page, which
-// is how that app finds the note again for its "Notes" box.
+// /new?title=…&url=…&label=…&folder=…&text=…&image=1 — a note about something in another Pocket
+// app (docs/notes-from-apps.md): its first line is the title, then a link to the thing's page,
+// which is how that app finds the note again for its "Notes" box. With image=1 the thing is shown
+// as a picture instead (a drawing from Pocket Draw). The server writes it (POST /notes/from).
 export default function NewFrom() {
   const [params] = useSearchParams()
   const { settings, bump } = useApp()
@@ -20,13 +21,8 @@ export default function NewFrom() {
     started.current = true
     const url = params.get('url') || ''
     if (!/^https?:\/\//i.test(url)) { setErr('This link has no web address to write the note about.'); return }
-    const title = (params.get('title') || '').trim() || 'Untitled'
-    const label = (params.get('label') || '').trim() || title
-    const text = (params.get('text') || '').trim()
     const folder = params.get('folder') ?? settings.default_folder ?? ''
-    const link = `[${label.replace(/[[\]]/g, '\\$&')}](${url.replace(/[()\s]/g, c => ({ '(': '%28', ')': '%29' } as Record<string, string>)[c] || '%20')})`
-    const content = `# ${title}\n\n${link}\n\n${text ? text + '\n\n' : ''}`
-    api.post<Note>(`${V1}/notes`, { title, category: folder, content })
+    api.post<Note>(`${V1}/notes/from`, { title: params.get('title') || '', url, label: params.get('label') || '', text: params.get('text') || '', folder, image: params.get('image') === '1' })
       .then(n => { bump(); navigate(`/note/${n.id}`, { replace: true }) })
       .catch(e => setErr((e as Error).message))
   }, [settings, params, navigate, bump])
