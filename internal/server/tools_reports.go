@@ -1063,25 +1063,71 @@ func (c *repCron) next(t time.Time) (time.Time, bool) {
 	return time.Time{}, false
 }
 
-// ---- Glances ----
+// ---- Pocket Monitoring ----
 
-// repGlances is the person's Glances: its own connection, or the address a
-// Beszel connection carries (GLANCES_URL).
-func (s *Server) repGlances(ctx context.Context, uid int64) (*svcCred, error) {
-	c, err := s.service(ctx, uid, "glances")
-	if err == nil {
-		return c, nil
-	}
-	var nc errNotConnected
-	if !errors.As(err, &nc) {
+// repMonSnapshot is the part of a Pocket Monitoring snapshot the reports use.
+type repMonSnapshot struct {
+	Host struct {
+		Threads   int   `json:"threads"`
+		UptimeSec int64 `json:"uptime_s"`
+	} `json:"host"`
+	CPU struct {
+		Total float64 `json:"total"`
+	} `json:"cpu"`
+	Load struct {
+		One float64 `json:"one"`
+	} `json:"load"`
+	Mem struct {
+		Total     float64 `json:"total"`
+		Available float64 `json:"available"`
+		Percent   float64 `json:"percent"`
+	} `json:"mem"`
+	FS []struct {
+		Mount   string  `json:"mount"`
+		Free    float64 `json:"free"`
+		Percent float64 `json:"percent"`
+	} `json:"fs"`
+	Procs struct {
+		Top []struct {
+			PID  int64   `json:"pid"`
+			Name string  `json:"name"`
+			CPU  float64 `json:"cpu"`
+			RSS  float64 `json:"rss"`
+		} `json:"top"`
+	} `json:"procs"`
+}
+
+// repServerSnapshot is the server Notes runs on as the person's Pocket
+// Monitoring sees it: their "local" server (the box Monitoring runs on),
+// else the first one they can see.
+func (s *Server) repServerSnapshot(ctx context.Context, uid int64) (*repMonSnapshot, error) {
+	base, tok, err := s.appToken(ctx, uid, "monitoring", "monitoring:read")
+	if err != nil {
 		return nil, err
 	}
-	if b, berr := s.service(ctx, uid, "beszel"); berr == nil {
-		if g := strings.TrimRight(b.Field("GLANCES_URL"), "/"); g != "" {
-			return &svcCred{Type: "glances", URL: g, PublicURL: g, Fields: map[string]string{}, Source: b.Source}, nil
+	hdr := map[string]string{"Authorization": "Bearer " + tok}
+	var servers []struct {
+		ID   int64  `json:"id"`
+		Kind string `json:"kind"`
+	}
+	if err := s.callJSON(ctx, "monitoring", http.MethodGet, base+"/api/v1/servers", hdr, nil, &servers); err != nil {
+		return nil, err
+	}
+	if len(servers) == 0 {
+		return nil, errors.New("Pocket Monitoring watches no server for you")
+	}
+	id := servers[0].ID
+	for _, sv := range servers {
+		if sv.Kind == "local" {
+			id = sv.ID
+			break
 		}
 	}
-	return nil, err
+	var snap repMonSnapshot
+	if err := s.callJSON(ctx, "monitoring", http.MethodGet, fmt.Sprintf("%s/api/v1/servers/%d/snapshot", base, id), hdr, nil, &snap); err != nil {
+		return nil, err
+	}
+	return &snap, nil
 }
 
 type repServer struct {
@@ -1096,91 +1142,23 @@ type repServer struct {
 	uptime          string
 }
 
-// repLoadServer reads CPU, memory, the root file system and uptime; a part
-// that fails is left out, all of them failing is an error.
-func (s *Server) repLoadServer(ctx context.Context, c *svcCred) (*repServer, error) {
-	out := &repServer{}
-	var mu sync.Mutex
-	var errs []error
-	var wg sync.WaitGroup
-	get := func(path string, v any) error {
-		return s.callJSON(ctx, "glances", http.MethodGet, c.API("/api/4/"+path), nil, nil, v)
+// repLoadServer reads CPU, memory, the root file system and uptime.
+func (s *Server) repLoadServer(ctx context.Context, uid int64) (*repServer, error) {
+	snap, err := s.repServerSnapshot(ctx, uid)
+	if err != nil {
+		return nil, err
 	}
-	run := func(f func() error) {
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
-			if err := f(); err != nil {
-				mu.Lock()
-				errs = append(errs, err)
-				mu.Unlock()
-			}
-		}()
+	out := &repServer{cpu: snap.CPU.Total, load1: snap.Load.One, cores: snap.Host.Threads, hasCPU: true}
+	if snap.Mem.Total > 0 {
+		out.memTotal, out.free, out.memPct, out.hasMem = snap.Mem.Total, snap.Mem.Available, snap.Mem.Percent, true
 	}
-	run(func() error {
-		var q struct {
-			CPU float64 `json:"cpu"`
+	for _, f := range snap.FS {
+		if f.Mount == "/" {
+			out.rootPct, out.rootFr, out.hasRoot = f.Percent, f.Free, true
 		}
-		var l struct {
-			Min1    float64 `json:"min1"`
-			CPUCore int     `json:"cpucore"`
-		}
-		if err := get("quicklook", &q); err != nil {
-			return err
-		}
-		if err := get("load", &l); err != nil {
-			return err
-		}
-		mu.Lock()
-		out.cpu, out.load1, out.cores, out.hasCPU = q.CPU, l.Min1, l.CPUCore, true
-		mu.Unlock()
-		return nil
-	})
-	run(func() error {
-		var m struct {
-			Total     float64 `json:"total"`
-			Available float64 `json:"available"`
-			Percent   float64 `json:"percent"`
-		}
-		if err := get("mem", &m); err != nil {
-			return err
-		}
-		mu.Lock()
-		out.memTotal, out.free, out.memPct, out.hasMem = m.Total, m.Available, m.Percent, true
-		mu.Unlock()
-		return nil
-	})
-	run(func() error {
-		var list []struct {
-			Mount   string  `json:"mnt_point"`
-			Free    float64 `json:"free"`
-			Percent float64 `json:"percent"`
-		}
-		if err := get("fs", &list); err != nil {
-			return err
-		}
-		mu.Lock()
-		for _, f := range list {
-			if f.Mount == "/" {
-				out.rootPct, out.rootFr, out.hasRoot = f.Percent, f.Free, true
-			}
-		}
-		mu.Unlock()
-		return nil
-	})
-	run(func() error {
-		var u string
-		if err := get("uptime", &u); err != nil {
-			return err
-		}
-		mu.Lock()
-		out.uptime = repCompactUptime(u)
-		mu.Unlock()
-		return nil
-	})
-	wg.Wait()
-	if len(errs) == 4 {
-		return nil, errs[0]
+	}
+	if sec := int(snap.Host.UptimeSec); sec > 0 {
+		out.uptime = repUptimeParts(sec/86400, sec%86400/3600, sec%3600/60)
 	}
 	return out, nil
 }
@@ -1192,28 +1170,14 @@ type repProc struct {
 	memRss float64
 }
 
-func (s *Server) repLoadProcesses(ctx context.Context, c *svcCred) ([]repProc, error) {
-	var raw []map[string]any
-	if err := s.callJSON(ctx, "glances", http.MethodGet, c.API("/api/4/processlist"), nil, nil, &raw); err != nil {
+func (s *Server) repLoadProcesses(ctx context.Context, uid int64) ([]repProc, error) {
+	snap, err := s.repServerSnapshot(ctx, uid)
+	if err != nil {
 		return nil, err
 	}
-	out := make([]repProc, 0, len(raw))
-	for _, p := range raw {
-		pr := repProc{name: repStr(p["name"])}
-		pid, _ := repNum(p["pid"])
-		pr.pid = int64(pid)
-		if v, ok := p["cpu_percent"].(float64); ok {
-			pr.cpu = v
-		}
-		switch mi := p["memory_info"].(type) {
-		case map[string]any:
-			pr.memRss, _ = repNum(mi["rss"])
-		case []any:
-			if len(mi) > 0 {
-				pr.memRss, _ = repNum(mi[0])
-			}
-		}
-		out = append(out, pr)
+	out := make([]repProc, 0, len(snap.Procs.Top))
+	for _, p := range snap.Procs.Top {
+		out = append(out, repProc{pid: p.PID, name: p.Name, cpu: p.CPU, memRss: p.RSS})
 	}
 	return out, nil
 }
@@ -1276,11 +1240,9 @@ func (s *Server) reportSnapshot(ctx context.Context, uid int64, in reportReq, no
 		backups *repBackups
 	)
 	fails, err := gather(ctx, []reportSource{
-		{name: "glances", run: func(ctx context.Context) error {
-			c, err := s.repGlances(ctx, uid)
-			if err == nil {
-				srv, err = s.repLoadServer(ctx, c)
-			}
+		{name: "monitoring", run: func(ctx context.Context) error {
+			var err error
+			srv, err = s.repLoadServer(ctx, uid)
 			return err
 		}},
 		{name: "beszel", run: func(ctx context.Context) error {
@@ -2131,15 +2093,13 @@ func (s *Server) reportHosts(ctx context.Context, uid int64, in reportReq, now t
 
 // ---- processes ----
 
-// reportProcesses is what the server is busy with: Glances' top processes by
-// CPU and by memory.
+// reportProcesses is what the server is busy with: Pocket Monitoring's top
+// processes by CPU and by memory.
 func (s *Server) reportProcesses(ctx context.Context, uid int64, in reportReq, now time.Time) (string, []string, error) {
 	var procs []repProc
-	fails, err := gather(ctx, []reportSource{{name: "glances", run: func(ctx context.Context) error {
-		c, err := s.repGlances(ctx, uid)
-		if err == nil {
-			procs, err = s.repLoadProcesses(ctx, c)
-		}
+	fails, err := gather(ctx, []reportSource{{name: "monitoring", run: func(ctx context.Context) error {
+		var err error
+		procs, err = s.repLoadProcesses(ctx, uid)
 		return err
 	}}})
 	if err != nil {

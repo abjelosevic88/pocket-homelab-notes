@@ -30,6 +30,7 @@ var linkUses = []core.Use{
 	{App: "garage", Scopes: []string{"vehicles:read"}, Reason: "The vehicle log (fill-ups, services) written into a note"},
 	{App: "podcasts", Scopes: []string{"history:read"}, Reason: "What you listened to this week written into a note, and episodes linked in a note"},
 	{App: "watch", Scopes: []string{"watching:read"}, Reason: "What you watched this week written into a note"},
+	{App: "monitoring", Scopes: []string{"monitoring:read"}, Reason: "The server's CPU, memory, disk and busiest processes written into a note"},
 	{App: "documents", Scopes: []string{"documents:read"}, Reason: "Find documents and link them in a note"},
 	{App: "bookshelf", Scopes: []string{"books:read"}, Reason: "Find your books and link them in a note"},
 	{App: "contacts", Scopes: []string{"contacts:read"}, Reason: "Link people in a note (type @ and a name), so the note shows on their page in Pocket Contacts"},

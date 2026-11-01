@@ -84,7 +84,7 @@ Notes apps and the Pocket Homelab app work against it too.
 - Blocks written from what the services know: homelab snapshot, what needs attention (Kuma,
   Scrutiny, Backrest), watched and listened this week (Pocket Watch, Pocket Podcasts, Audiobookshelf),
   spending this month (Pocket Money), the vehicle log (Pocket Garage), hosts on the network
-  (AdGuard), server processes (Glances), days of habits (Pocket Habits).
+  (AdGuard), server processes (Pocket Monitoring), days of habits (Pocket Habits).
 - Web bookmark with the page's title, a voice memo (with its words, where the browser can), a photo.
 
 **Finding and keeping**

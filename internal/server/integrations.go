@@ -34,7 +34,6 @@ var serviceUses = []core.ServiceUse{
 	{Type: "scrutiny", Reason: "Disks with warnings, in a note"},
 	{Type: "backrest", Reason: "Backups that need a look, in a note"},
 	{Type: "adguard", Reason: "The hosts on your network, in a note"},
-	{Type: "glances", Reason: "What the server is busy with, in a note"},
 	{Type: "beszel", Reason: "The homelab snapshot: systems with CPU, memory, disk and temperature"},
 }
 
@@ -48,8 +47,8 @@ var serviceNames = map[string]string{
 	"tasks":     "Pocket Tasks",
 	"nextcloud": "Nextcloud", "immich": "Immich", "forgejo": "Forgejo", "jellyfin": "Jellyfin",
 	"audiobookshelf": "Audiobookshelf", "kuma": "Uptime Kuma", "scrutiny": "Scrutiny", "backrest": "Backrest",
-	"adguard": "AdGuard Home", "glances": "Glances", "beszel": "Beszel",
-	"habits": "Pocket Habits", "money": "Pocket Money", "garage": "Pocket Garage", "podcasts": "Pocket Podcasts", "watch": "Pocket Watch", "documents": "Pocket Documents", "bookshelf": "Pocket Bookshelf",
+	"adguard": "AdGuard Home", "beszel": "Beszel",
+	"habits": "Pocket Habits", "money": "Pocket Money", "garage": "Pocket Garage", "podcasts": "Pocket Podcasts", "watch": "Pocket Watch", "monitoring": "Pocket Monitoring", "documents": "Pocket Documents", "bookshelf": "Pocket Bookshelf",
 	"contacts": "Pocket Contacts", "files": "Pocket Files", "draw": "Pocket Draw",
 }
 
@@ -60,8 +59,8 @@ var directFields = map[string][2]string{
 	"nextcloud": {"App password", "Username"}, "immich": {"API key", ""}, "forgejo": {"Token", ""},
 	"jellyfin": {"API key", "User id (optional)"}, "audiobookshelf": {"Token", ""},
 	"kuma": {"API key (optional)", "Status page slug"}, "scrutiny": {"", ""}, "backrest": {"Password", "Username"}, "adguard": {"Password", "Username"},
-	"glances": {"", ""}, "beszel": {"Password", "Email"},
-	"habits": {"API token", ""}, "money": {"API token", ""}, "garage": {"API token", ""}, "podcasts": {"API token", ""}, "watch": {"API token", ""}, "documents": {"API token", ""}, "bookshelf": {"API token", ""},
+	"beszel": {"Password", "Email"},
+	"habits": {"API token", ""}, "money": {"API token", ""}, "garage": {"API token", ""}, "podcasts": {"API token", ""}, "watch": {"API token", ""}, "monitoring": {"API token", ""}, "documents": {"API token", ""}, "bookshelf": {"API token", ""},
 	"contacts": {"API token", ""}, "draw": {"API token", ""},
 }
 
@@ -363,9 +362,6 @@ var integrationTests = map[string]func(s *Server, ctx context.Context, c *svcCre
 	"scrutiny": func(s *Server, ctx context.Context, c *svcCred) error {
 		return s.callJSON(ctx, "scrutiny", http.MethodGet, c.API("/api/summary"), nil, nil, nil)
 	},
-	"glances": func(s *Server, ctx context.Context, c *svcCred) error {
-		return s.callJSON(ctx, "glances", http.MethodGet, c.API("/api/4/cpu"), nil, nil, nil)
-	},
 	"adguard": func(s *Server, ctx context.Context, c *svcCred) error {
 		return s.callJSON(ctx, "adguard", http.MethodGet, c.API("/control/status"), map[string]string{"Authorization": basicAuth(c.Field("USERNAME"), c.Field("PASSWORD"))}, nil, nil)
 	},
@@ -519,13 +515,13 @@ var toolNeeds = map[string][]string{
 	"photos":    {"svc:immich"},
 	"files":     {"svc:nextcloud"},
 	"bookmark":  {},
-	"snapshot":  {"svc:beszel", "svc:glances", "svc:kuma", "svc:scrutiny", "svc:backrest"},
+	"snapshot":  {"svc:beszel", "app:monitoring", "svc:kuma", "svc:scrutiny", "svc:backrest"},
 	"attention": {"svc:kuma", "svc:scrutiny", "svc:backrest"},
 	"media":     {"app:watch", "app:podcasts", "svc:audiobookshelf"},
 	"spent":     {"app:money"},
 	"fuel":      {"app:garage"},
 	"hosts":     {"svc:adguard"},
-	"processes": {"svc:glances"},
+	"processes": {"app:monitoring"},
 	"habits":    {"app:habits"},
 	"task":      {"svc:nextcloud"},
 	"expense":   {"app:money"},

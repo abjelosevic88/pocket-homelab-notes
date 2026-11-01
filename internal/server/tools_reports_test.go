@@ -179,31 +179,31 @@ func fakeBackrest(t *testing.T, now time.Time) *httptest.Server {
 	})
 }
 
-func fakeGlances(t *testing.T) *httptest.Server {
+func fakeMonitoring(t *testing.T) *httptest.Server {
 	return fakeServer(t, map[string]http.HandlerFunc{
-		"/api/4/quicklook": func(w http.ResponseWriter, r *http.Request) {
-			fakeJSON(w, map[string]any{"cpu": 23.4, "cpu_name": "Intel N100", "mem": 40})
-		},
-		"/api/4/load": func(w http.ResponseWriter, r *http.Request) {
-			fakeJSON(w, map[string]any{"min1": 1.234, "min5": 1, "min15": 1, "cpucore": 4})
-		},
-		"/api/4/mem": func(w http.ResponseWriter, r *http.Request) {
-			fakeJSON(w, map[string]any{"total": 16e9, "available": 10e9, "percent": 37.5, "used": 6e9})
-		},
-		"/api/4/fs": func(w http.ResponseWriter, r *http.Request) {
+		"/api/v1/servers": needBearer("mon-token", func(w http.ResponseWriter, r *http.Request) {
 			fakeJSON(w, []any{
-				map[string]any{"mnt_point": "/", "size": 500e9, "free": 120.3e9, "percent": 75.9, "device_name": "/dev/nvme0n1p2"},
-				map[string]any{"mnt_point": "/mnt/storage", "size": 2e12, "free": 1e12, "percent": 50},
+				map[string]any{"id": 2, "name": "NAS", "kind": "agent"},
+				map[string]any{"id": 1, "name": "Home server", "kind": "local"},
 			})
-		},
-		"/api/4/uptime": func(w http.ResponseWriter, r *http.Request) { fakeJSON(w, "20 days, 5:35:18") },
-		"/api/4/processlist": func(w http.ResponseWriter, r *http.Request) {
-			fakeJSON(w, []any{
-				map[string]any{"pid": 101, "name": "jellyfin", "cmdline": []string{"/usr/bin/jellyfin"}, "cpu_percent": 55.5, "memory_percent": 8, "memory_info": map[string]any{"rss": 1.5e9, "vms": 3e9}},
-				map[string]any{"pid": 202, "name": "postgres", "cmdline": "postgres: writer", "cpu_percent": 2.25, "memory_percent": 12, "memory_info": map[string]any{"rss": 2.5e9}},
-				map[string]any{"pid": 303, "name": "ff|mpeg", "cmdline": []string{}, "cpu_percent": "?", "memory_info": []any{300e6, 900e6}},
+		}),
+		"/api/v1/servers/1/snapshot": needBearer("mon-token", func(w http.ResponseWriter, r *http.Request) {
+			fakeJSON(w, map[string]any{
+				"host": map[string]any{"threads": 4, "uptime_s": 20*86400 + 5*3600 + 35*60 + 18},
+				"cpu":  map[string]any{"total": 23.4},
+				"load": map[string]any{"one": 1.234, "five": 1, "fifteen": 1},
+				"mem":  map[string]any{"total": 16e9, "available": 10e9, "percent": 37.5, "used": 6e9},
+				"fs": []any{
+					map[string]any{"mount": "/", "total": 500e9, "free": 120.3e9, "percent": 75.9},
+					map[string]any{"mount": "/mnt/storage", "total": 2e12, "free": 1e12, "percent": 50},
+				},
+				"procs": map[string]any{"total": 3, "top": []any{
+					map[string]any{"pid": 101, "name": "jellyfin", "cpu": 55.5, "rss": 1.5e9},
+					map[string]any{"pid": 202, "name": "postgres", "cpu": 2.25, "rss": 2.5e9},
+					map[string]any{"pid": 303, "name": "ff|mpeg", "cpu": 0, "rss": 300e6},
+				}},
 			})
-		},
+		}),
 	})
 }
 
@@ -320,7 +320,7 @@ func TestReportSnapshot(t *testing.T) {
 	h := newHarness(t)
 	u, tok := h.user("a@example.com")
 	now := time.Now()
-	connectSvc(t, h, u.ID, "glances", fakeGlances(t).URL, "", "")
+	connectApp(t, h, u.ID, "monitoring", fakeMonitoring(t).URL, "mon-token")
 	connectSvc(t, h, u.ID, "beszel", fakeBeszel(t).URL, "me@example.com", "bz-pass")
 	connectSvc(t, h, u.ID, "kuma", fakeKuma(t, now).URL, "home", "")
 	connectSvc(t, h, u.ID, "scrutiny", fakeScrutiny(t).URL, "", "")
@@ -583,7 +583,7 @@ func TestReportHostsEmpty(t *testing.T) {
 func TestReportProcesses(t *testing.T) {
 	h := newHarness(t)
 	u, tok := h.user("a@example.com")
-	connectSvc(t, h, u.ID, "glances", fakeGlances(t).URL, "", "")
+	connectApp(t, h, u.ID, "monitoring", fakeMonitoring(t).URL, "mon-token")
 	code, out := runReport(t, h, tok, "processes", nil)
 	if code != http.StatusOK || out.Empty {
 		t.Fatalf("processes: %d %+v", code, out)

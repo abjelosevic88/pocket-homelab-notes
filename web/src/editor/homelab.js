@@ -115,7 +115,7 @@ export const entries = [
   ['spent', { title: 'Spending this month', label: 'Spending this month spent money firefly categories transactions', description: 'By category, and the largest transactions, from Firefly', icon: icons.spent, onRun: simple('spent') }],
   ['fuel', { title: 'Vehicle log', label: 'Vehicle log fuel fill-ups car service repairs lubelogger', description: 'What each car cost this month and this year, and its last fill-ups and services', icon: icons.fuel, onRun: simple('fuel') }],
   ['hosts', { title: 'Hosts on the network', label: 'Hosts on the network ip addresses clients adguard devices', description: 'AdGuard’s busiest clients, with their names', icon: icons.hosts, onRun: simple('hosts') }],
-  ['processes', { title: 'Server processes', label: 'Server processes top cpu memory glances', description: 'What the server is busy with, by CPU and by memory', icon: icons.processes, onRun: simple('processes') }],
+  ['processes', { title: 'Server processes', label: 'Server processes top cpu memory monitoring', description: 'What the server is busy with, by CPU and by memory', icon: icons.processes, onRun: simple('processes') }],
   ['habits', { title: 'Days of habits', label: 'Days of habits habit tracker journal streak sleep mood pocket habits', description: 'Habits done and missed, the trackers and the journal, for the days you pick, from Pocket Habits', icon: icons.habits, onRun: simple('habits') }],
   ['expense', { title: 'Make this line a transaction', label: 'Make this line a transaction expense firefly money spent', description: 'The line above, as template + amount + what for (e.g. groceries 24.50 bread), goes to the Firefly assistant; a link comes back', icon: icons.expense, onRun: lineItem('expense') }],
 ]
