@@ -29,7 +29,6 @@ var serviceUses = []core.ServiceUse{
 	{Type: "immich", Reason: "Photos from your library, put into a note"},
 	{Type: "forgejo", Reason: "Links to issues and pull requests"},
 	{Type: "jellyfin", Reason: "Links to films and series"},
-	{Type: "jellystat", Reason: "What you watched this week, in a note"},
 	{Type: "audiobookshelf", Reason: "The books you are listening to, in a note"},
 	{Type: "kuma", Reason: "Monitors that are down and this week's outages, in a note"},
 	{Type: "scrutiny", Reason: "Disks with warnings, in a note"},
@@ -48,9 +47,9 @@ var libraryOnlyApps = map[string]bool{"files": true}
 var serviceNames = map[string]string{
 	"tasks":     "Pocket Tasks",
 	"nextcloud": "Nextcloud", "immich": "Immich", "forgejo": "Forgejo", "jellyfin": "Jellyfin",
-	"jellystat": "Jellystat", "audiobookshelf": "Audiobookshelf", "kuma": "Uptime Kuma", "scrutiny": "Scrutiny", "backrest": "Backrest",
+	"audiobookshelf": "Audiobookshelf", "kuma": "Uptime Kuma", "scrutiny": "Scrutiny", "backrest": "Backrest",
 	"adguard": "AdGuard Home", "glances": "Glances", "beszel": "Beszel",
-	"habits": "Pocket Habits", "money": "Pocket Money", "garage": "Pocket Garage", "podcasts": "Pocket Podcasts", "documents": "Pocket Documents", "bookshelf": "Pocket Bookshelf",
+	"habits": "Pocket Habits", "money": "Pocket Money", "garage": "Pocket Garage", "podcasts": "Pocket Podcasts", "watch": "Pocket Watch", "documents": "Pocket Documents", "bookshelf": "Pocket Bookshelf",
 	"contacts": "Pocket Contacts", "files": "Pocket Files", "draw": "Pocket Draw",
 }
 
@@ -59,10 +58,10 @@ var serviceNames = map[string]string{
 var directFields = map[string][2]string{
 	"tasks":     {"API token", ""},
 	"nextcloud": {"App password", "Username"}, "immich": {"API key", ""}, "forgejo": {"Token", ""},
-	"jellyfin": {"API key", "User id (optional)"}, "jellystat": {"API key", ""}, "audiobookshelf": {"Token", ""},
+	"jellyfin": {"API key", "User id (optional)"}, "audiobookshelf": {"Token", ""},
 	"kuma": {"API key (optional)", "Status page slug"}, "scrutiny": {"", ""}, "backrest": {"Password", "Username"}, "adguard": {"Password", "Username"},
 	"glances": {"", ""}, "beszel": {"Password", "Email"},
-	"habits": {"API token", ""}, "money": {"API token", ""}, "garage": {"API token", ""}, "podcasts": {"API token", ""}, "documents": {"API token", ""}, "bookshelf": {"API token", ""},
+	"habits": {"API token", ""}, "money": {"API token", ""}, "garage": {"API token", ""}, "podcasts": {"API token", ""}, "watch": {"API token", ""}, "documents": {"API token", ""}, "bookshelf": {"API token", ""},
 	"contacts": {"API token", ""}, "draw": {"API token", ""},
 }
 
@@ -358,9 +357,6 @@ var integrationTests = map[string]func(s *Server, ctx context.Context, c *svcCre
 	"jellyfin": func(s *Server, ctx context.Context, c *svcCred) error {
 		return s.callJSON(ctx, "jellyfin", http.MethodGet, c.API("/System/Info"), map[string]string{"X-Emby-Token": c.Key}, nil, nil)
 	},
-	"jellystat": func(s *Server, ctx context.Context, c *svcCred) error {
-		return s.callJSON(ctx, "jellystat", http.MethodGet, c.API("/stats/getLibraryOverview"), map[string]string{"x-api-token": c.Key}, nil, nil)
-	},
 	"audiobookshelf": func(s *Server, ctx context.Context, c *svcCred) error {
 		return s.callJSON(ctx, "audiobookshelf", http.MethodGet, c.API("/api/me"), map[string]string{"Authorization": "Bearer " + c.Key}, nil, nil)
 	},
@@ -525,7 +521,7 @@ var toolNeeds = map[string][]string{
 	"bookmark":  {},
 	"snapshot":  {"svc:beszel", "svc:glances", "svc:kuma", "svc:scrutiny", "svc:backrest"},
 	"attention": {"svc:kuma", "svc:scrutiny", "svc:backrest"},
-	"media":     {"svc:jellystat", "app:podcasts", "svc:audiobookshelf"},
+	"media":     {"app:watch", "app:podcasts", "svc:audiobookshelf"},
 	"spent":     {"app:money"},
 	"fuel":      {"app:garage"},
 	"hosts":     {"svc:adguard"},

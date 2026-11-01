@@ -1572,30 +1572,36 @@ type repMedia struct {
 
 var repMediaKinds = []string{"Watched", "Listened", "Listening to", "Finished"}
 
-// reportMedia is what was watched and listened to: Jellystat's plays,
+// reportMedia is what was watched and listened to: Pocket Watch's history,
 // Pocket Podcasts' history, the books in progress in Audiobookshelf.
 func (s *Server) reportMedia(ctx context.Context, uid int64, in reportReq, now time.Time) (string, []string, error) {
 	since := now.Add(-time.Duration(in.Days) * 24 * time.Hour)
 	var watched, listened, reading []repMedia
 	fails, err := gather(ctx, []reportSource{
-		{name: "jellystat", run: func(ctx context.Context) error {
-			c, err := s.service(ctx, uid, "jellystat")
+		{name: "watch", run: func(ctx context.Context) error {
+			base, tok, err := s.appToken(ctx, uid, "watch", "watching:read")
 			if err != nil {
 				return err
 			}
 			var page struct {
-				Results []map[string]any `json:"results"`
+				Items []struct {
+					Title     string `json:"title"`
+					Series    string `json:"series"`
+					Seconds   int    `json:"seconds"`
+					WatchedAt string `json:"watched_at"`
+				} `json:"items"`
 			}
-			if err := s.callJSON(ctx, "jellystat", http.MethodGet, c.API("/stats/getPlaybackActivity?size=50&page=1"), map[string]string{"x-api-token": c.Key}, nil, &page); err != nil {
+			// a day either side: Watch's days are in its own time zone
+			q := url.Values{"from": {since.AddDate(0, 0, -1).Format("2006-01-02")}, "to": {now.AddDate(0, 0, 1).Format("2006-01-02")}, "limit": {"200"}}
+			if err := s.callJSON(ctx, "watch", http.MethodGet, base+"/api/v1/history?"+q.Encode(), map[string]string{"Authorization": "Bearer " + tok}, nil, &page); err != nil {
 				return err
 			}
-			for _, r := range page.Results {
-				secs, _ := repNum(r["PlaybackDuration"])
-				if secs < 300 { // a few minutes of something is not watching it
+			for _, r := range page.Items {
+				if r.Seconds < 300 { // a few minutes of something (or a bulk "mark watched") is not watching it
 					continue
 				}
-				m := repMedia{kind: "Watched", title: firstNonEmpty(repStr(r["NowPlayingItemName"]), "?"), detail: repStr(r["SeriesName"]), minutes: int(secs / 60)}
-				m.date, _ = repParseTime(repStr(r["ActivityDateInserted"]))
+				m := repMedia{kind: "Watched", title: firstNonEmpty(r.Title, "?"), detail: r.Series, minutes: r.Seconds / 60}
+				m.date, _ = repParseTime(r.WatchedAt)
 				watched = append(watched, m)
 			}
 			return nil

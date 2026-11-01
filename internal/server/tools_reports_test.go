@@ -351,19 +351,20 @@ func TestReportMedia(t *testing.T) {
 	u, tok := h.user("a@example.com")
 	now := time.Now().UTC()
 	iso := func(ago time.Duration) string { return now.Add(-ago).Format(time.RFC3339) }
-	js := fakeServer(t, map[string]http.HandlerFunc{
-		"/stats/getPlaybackActivity": func(w http.ResponseWriter, r *http.Request) {
-			if r.Header.Get("x-api-token") != "js-key" {
-				http.Error(w, "{}", http.StatusUnauthorized)
+	watch := fakeServer(t, map[string]http.HandlerFunc{
+		"/api/v1/history": needBearer("watch-token", func(w http.ResponseWriter, r *http.Request) {
+			if r.URL.Query().Get("from") == "" || r.URL.Query().Get("to") == "" {
+				http.Error(w, "{}", http.StatusBadRequest)
 				return
 			}
-			fakeJSON(w, map[string]any{"current_page": 1, "pages": 1, "size": 50, "results": []any{
-				map[string]any{"Id": "a1", "UserName": "aleks", "NowPlayingItemName": "Pilot", "SeriesName": "Severance", "PlaybackDuration": "2700", "ActivityDateInserted": iso(24 * time.Hour)},
-				map[string]any{"Id": "a2", "UserName": "aleks", "NowPlayingItemName": "Trailer", "PlaybackDuration": 90, "ActivityDateInserted": iso(time.Hour)},
-				map[string]any{"Id": "a3", "UserName": "aleks", "NowPlayingItemName": "Old film", "PlaybackDuration": 6000, "ActivityDateInserted": iso(20 * 24 * time.Hour)},
-				map[string]any{"Id": "a4", "UserName": "aleks", "NowPlayingItemName": "Dune", "SeriesName": nil, "PlaybackDuration": 9000, "ActivityDateInserted": iso(48 * time.Hour)},
+			fakeJSON(w, map[string]any{"total": 5, "items": []any{
+				map[string]any{"id": 1, "kind": "episode", "title": "Pilot", "series": "Severance", "seconds": 2700, "watched_at": iso(24 * time.Hour)},
+				map[string]any{"id": 2, "kind": "movie", "title": "Trailer", "seconds": 90, "watched_at": iso(time.Hour)},
+				map[string]any{"id": 3, "kind": "movie", "title": "Old film", "seconds": 6000, "watched_at": iso(20 * 24 * time.Hour)},
+				map[string]any{"id": 4, "kind": "movie", "title": "Dune", "seconds": 9000, "watched_at": iso(48 * time.Hour)},
+				map[string]any{"id": 5, "kind": "movie", "title": "Marked", "seconds": 0, "completed": true, "watched_at": iso(2 * time.Hour)},
 			}})
-		},
+		}),
 	})
 	pod := fakeServer(t, map[string]http.HandlerFunc{
 		"/api/v1/history": needBearer("pod-token", func(w http.ResponseWriter, r *http.Request) {
@@ -383,7 +384,7 @@ func TestReportMedia(t *testing.T) {
 			}})
 		}),
 	})
-	connectSvc(t, h, u.ID, "jellystat", js.URL, "", "js-key")
+	connectApp(t, h, u.ID, "watch", watch.URL, "watch-token")
 	connectApp(t, h, u.ID, "podcasts", pod.URL, "pod-token")
 	connectSvc(t, h, u.ID, "audiobookshelf", abs.URL, "", "abs-token")
 
@@ -405,7 +406,7 @@ func TestReportMedia(t *testing.T) {
 		"| Project Hail Mary | Andy Weir |  |",
 		"| Dune | Frank Herbert |  |",
 	)
-	for _, gone := range []string{"Trailer", "Old film", "Way back"} {
+	for _, gone := range []string{"Trailer", "Old film", "Way back", "Marked"} {
 		if strings.Contains(md, gone) {
 			t.Errorf("%q should be left out:\n%s", gone, md)
 		}
