@@ -10,7 +10,7 @@ import { Icon } from './icons'
 import { RichEditor, type EditorMessage, type RichEditorHandle } from './RichEditor'
 import { MarkdownEditor, type MarkdownEditorHandle } from './MarkdownEditor'
 import { BookmarkSheet, DiagramViewer, DrawPicker, ExpenseSheet, FilesPicker, HabitsSheet, LinkPicker, PhotoPicker, TaskSheet, TemplatePicker, VoiceMemo, toolError } from './Tools'
-import { HistoryModal, MoveModal, ShareModal } from './NoteDialogs'
+import { HistoryModal, MoveModal, PeopleModal, ShareModal } from './NoteDialogs'
 import { exportHTML, printNote } from '../lib/export'
 import { copyText } from '../lib/clipboard'
 import type { NoteAction } from './NoteMenu'
@@ -20,7 +20,7 @@ type Status = 'saved' | 'dirty' | 'saving' | 'error' | 'conflict' | 'offline'
 type Sheet =
   | { kind: 'link' } | { kind: 'bookmark' } | { kind: 'draw' } | { kind: 'photos' } | { kind: 'files' } | { kind: 'habits' } | { kind: 'voice' } | { kind: 'templates' }
   | { kind: 'task'; line: Line | null } | { kind: 'expense'; line: Line | null } | { kind: 'diagram'; svg: string }
-  | { kind: 'history' } | { kind: 'share' } | { kind: 'move' } | { kind: 'delete' }
+  | { kind: 'history' } | { kind: 'share' } | { kind: 'people' } | { kind: 'move' } | { kind: 'delete' } | { kind: 'leave' }
 type Line = { text: string; from?: number }
 
 const REPORTS: Record<string, string> = { snapshot: 'the homelab', attention: 'what needs attention', media: 'this week’s viewing and listening', spent: 'this month’s spending', fuel: 'the vehicle log', hosts: 'the network', processes: 'the server' }
@@ -36,7 +36,7 @@ const noteIdIn = (url: string): number | null => {
 export interface NoteViewHandle { saveNow(): Promise<void>; reload(): Promise<void> }
 
 const NoteView = forwardRef<NoteViewHandle, { id: number; onBack?: () => void; embedded?: boolean }>(function NoteView({ id, onBack, embedded }, ref) {
-  const { settings, tools, addresses, theme, bump } = useApp()
+  const { settings, tools, addresses, theme, bump, user } = useApp()
   const { toast } = useToast()
   const navigate = useNavigate()
   const [note, setNote] = useState<Note | null>(null)
@@ -394,7 +394,7 @@ const NoteView = forwardRef<NoteViewHandle, { id: number; onBack?: () => void; e
     if (!note) return
     const mine = cur.current.draft
     try {
-      const copy = await api.post<Note>(`${V1}/notes`, { title: `${note.title} (my version)`, category: note.category, content: mine })
+      const copy = await api.post<Note>(`${V1}/notes`, { title: `${note.title} (my version)`, category: note.shared_from ? undefined : note.category, content: mine })
       takeTheirs(); bump()
       toast('Your version is kept as a new note')
       navigate(`/note/${copy.id}${location.search}`)
@@ -404,15 +404,33 @@ const NoteView = forwardRef<NoteViewHandle, { id: number; onBack?: () => void; e
   if (err) return <div className="note-empty"><div className="callout danger"><Icon name="alert" size={15} /><span>{err}</span></div>{onBack && <button type="button" className="btn mt" onClick={onBack}><Icon name="chevron-left" size={16} />Back</button>}</div>
   if (!note) return <div className="note-empty"><Loading /></div>
 
-  const menuItems = (): MenuItem[] => [
+  const from = note.shared_from
+  const leave = async () => {
+    try { await api.del(`${V1}/notes/${note.id}/members/${user?.id}`); bump(); toast('Removed from your Shared'); navigate(`/?view=shared`) } catch (e) { toast((e as Error).message, 'err') }
+  }
+  // Someone else's note: read it, copy it, write in it when allowed; its folder, star, pin, links and life are the owner's.
+  const sharedMenu = (): MenuItem[] => [
+    ...(phone() ? [{ label: 'Outline and info', icon: 'panel-right', onSelect: () => setPanel('outline') }, 'sep' as const] : []),
+    { label: 'Who has it…', icon: 'users', onSelect: () => setSheet({ kind: 'people' }) },
+    { label: 'History…', icon: 'history', onSelect: () => setSheet({ kind: 'history' }) },
+    { label: 'Copy to my notes', icon: 'copy', onSelect: async () => { try { const n = await api.post<Note>(`${V1}/notes/${note.id}/duplicate`); bump(); toast('Copied to your notes'); navigate(`/note/${n.id}`) } catch (e) { toast((e as Error).message, 'err') } } },
+    'sep',
+    { label: 'Copy link', icon: 'link', onSelect: async () => { const ok = await copyText(`${location.origin}/note/${note.id}?view=shared`); toast(ok ? 'Link copied' : 'Could not copy the link', ok ? 'ok' : 'err') } },
+    { label: 'Download .md', icon: 'download', onSelect: () => { location.href = `${V1}/notes/${note.id}/download` } },
+    { label: 'Print / PDF', icon: 'printer', onSelect: () => doExport('pdf') },
+    'sep',
+    { label: 'Remove from my Shared…', icon: 'x', danger: true, onSelect: () => setSheet({ kind: 'leave' }) },
+  ]
+  const menuItems = (): MenuItem[] => from ? sharedMenu() : [
     ...(phone() ? [
       { label: note.favorite ? 'Remove from favourites' : 'Favourite', icon: 'star', onSelect: () => patch({ favorite: !note.favorite }) },
       { label: note.pinned ? 'Unpin' : 'Pin to the top', icon: 'pushpin', onSelect: () => patch({ pinned: !note.pinned }) },
       { label: 'Outline, links and info', icon: 'panel-right', onSelect: () => setPanel('outline') },
       'sep' as const,
     ] : []),
-    { label: 'History…', icon: 'history', onSelect: () => setSheet({ kind: 'history' }) },
+    { label: note.shared ? `Shared with ${note.shared} ${note.shared === 1 ? 'person' : 'people'}…` : 'Share with people…', icon: 'users', onSelect: () => setSheet({ kind: 'people' }) },
     { label: 'Share a link…', icon: 'share', onSelect: () => setSheet({ kind: 'share' }) },
+    { label: 'History…', icon: 'history', onSelect: () => setSheet({ kind: 'history' }) },
     { label: 'Move to…', icon: 'move', onSelect: () => setSheet({ kind: 'move' }) },
     { label: 'Duplicate', icon: 'copy', onSelect: async () => { try { const n = await api.post<Note>(`${V1}/notes/${note.id}/duplicate`); bump(); navigate(`/note/${n.id}${location.search}`) } catch (e) { toast((e as Error).message, 'err') } } },
     'sep',
@@ -441,14 +459,19 @@ const NoteView = forwardRef<NoteViewHandle, { id: number; onBack?: () => void; e
         {onBack && <button type="button" className="btn ghost icon-only back-btn" onClick={onBack} aria-label="Back to the list"><Icon name="chevron-left" size={20} /></button>}
         <div className="note-title-wrap">
           <div className="note-crumbs">
-            <Link to={`/?in=${encodeURIComponent(note.category)}`}><Icon name="folder" size={12} />{note.category ? note.category.split('/').join(' › ') : 'Notes'}</Link>
+            {from
+              ? <><Link to="/?view=shared" title={from.email}><Icon name="users" size={12} />Shared by {from.name || from.email}</Link><span className={`share-perm ${from.can_edit ? 'edit' : ''}`}>{from.can_edit ? 'can edit' : 'read only'}</span></>
+              : <>
+                  <Link to={`/?in=${encodeURIComponent(note.category)}`}><Icon name="folder" size={12} />{note.category ? note.category.split('/').join(' › ') : 'Notes'}</Link>
+                  {!!note.shared && <button type="button" className="share-perm link-like" onClick={() => setSheet({ kind: 'people' })} title="Who it is shared with"><Icon name="users" size={11} />shared with {note.shared}</button>}
+                </>}
           </div>
           <input className="note-title" value={title} onChange={e => setTitle(e.target.value)} onBlur={rename} onKeyDown={e => { if (e.key === 'Enter') { (e.target as HTMLInputElement).blur() } if (e.key === 'Escape') { setTitle(note.title); (e.target as HTMLInputElement).blur() } }} readOnly={locked} aria-label="Title" />
         </div>
         <div className="note-actions">
           <span className={`save-state ${status}`} title={stamp(note.modified)}>{statusText[status]}</span>
-          <button type="button" className={`btn ghost icon-only wide-only ${note.favorite ? 'on star' : ''}`} title={note.favorite ? 'Remove from favourites' : 'Favourite'} aria-label={note.favorite ? 'Remove from favourites' : 'Favourite'} aria-pressed={note.favorite} onClick={() => patch({ favorite: !note.favorite })}><Icon name="star" size={17} /></button>
-          <button type="button" className={`btn ghost icon-only wide-only ${note.pinned ? 'on' : ''}`} title={note.pinned ? 'Unpin' : 'Pin to the top'} aria-label={note.pinned ? 'Unpin' : 'Pin to the top'} aria-pressed={note.pinned} onClick={() => patch({ pinned: !note.pinned })}><Icon name="pushpin" size={17} /></button>
+          {!from && <button type="button" className={`btn ghost icon-only wide-only ${note.favorite ? 'on star' : ''}`} title={note.favorite ? 'Remove from favourites' : 'Favourite'} aria-label={note.favorite ? 'Remove from favourites' : 'Favourite'} aria-pressed={note.favorite} onClick={() => patch({ favorite: !note.favorite })}><Icon name="star" size={17} /></button>}
+          {!from && <button type="button" className={`btn ghost icon-only wide-only ${note.pinned ? 'on' : ''}`} title={note.pinned ? 'Unpin' : 'Pin to the top'} aria-label={note.pinned ? 'Unpin' : 'Pin to the top'} aria-pressed={note.pinned} onClick={() => patch({ pinned: !note.pinned })}><Icon name="pushpin" size={17} /></button>}
           {!note.readonly && <button type="button" className={`btn ghost icon-only reader-btn ${reading ? 'on' : ''}`} title={reading ? 'Back to editing' : 'Reader mode'} aria-label="Reader mode" aria-pressed={reading} onClick={toggleReading}><Icon name="book-open" size={17} /></button>}
           <Segmented size="sm" className="mode-toggle" label="Editor" value={mode} onChange={m => { const p = rich.current?.flush(); if (p != null) changed(p); setMode(m); setRevision(r => r + 1) }}
             options={[{ value: 'rich' as const, label: 'Aa', title: 'Rich text' }, { value: 'markdown' as const, label: 'M↓', title: 'Markdown source' }]} />
@@ -517,6 +540,8 @@ const NoteView = forwardRef<NoteViewHandle, { id: number; onBack?: () => void; e
       {sheet?.kind === 'diagram' && <DiagramViewer svg={sheet.svg} onClose={() => setSheet(null)} />}
       {sheet?.kind === 'history' && <HistoryModal note={note} onClose={() => setSheet(null)} onRestored={n => { const c = cur.current; c.etag = n.etag; c.saved = n.content || ''; c.draft = c.saved; setNote(n); setDraft(c.saved); setRevision(r => r + 1); setSheet(null); toast('Restored') }} />}
       {sheet?.kind === 'share' && <ShareModal note={note} onClose={() => setSheet(null)} />}
+      {sheet?.kind === 'people' && <PeopleModal note={note} onClose={() => setSheet(null)} onChanged={count => { if (!from && count !== (note.shared || 0)) { setNote(n => n && { ...n, shared: count }); bump() } }} />}
+      {sheet?.kind === 'leave' && <Confirm title={`Remove “${note.title}” from your Shared?`} message={<>It stays {from?.name || from?.email}’s note; you just stop seeing it. They can share it with you again.</>} confirmLabel="Remove" onCancel={() => setSheet(null)} onConfirm={async () => { setSheet(null); await leave() }} />}
       {sheet?.kind === 'move' && <MoveModal current={note.category} onClose={() => setSheet(null)} onMove={async cat => { setSheet(null); await patch({ category: cat }, `Moved to ${cat || 'Notes'}`) }} />}
       {sheet?.kind === 'delete' && <Confirm title={`Delete “${note.title}”?`} message={<>It goes to the trash (Trash in the sidebar) for {settings?.trash_days ?? 30} days{settings?.storage_kind === 'nextcloud' ? ', and to Nextcloud’s own trash bin' : ''}.</>} onCancel={() => setSheet(null)} onConfirm={async () => { setSheet(null); await remove() }} />}
     </div>

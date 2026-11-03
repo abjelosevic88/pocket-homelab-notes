@@ -211,6 +211,11 @@ func (s *Server) Router() http.Handler {
 			r.Get("/notes/{id}/shares", s.handleNoteShares)
 			r.Post("/notes/{id}/shares", s.handleCreateShare)
 			r.Get("/notes/{id}/download", s.handleDownloadNote)
+			r.Get("/notes/{id}/members", s.handleNoteMembers)
+			r.Post("/notes/{id}/members", s.handleSetMember)
+			r.Delete("/notes/{id}/members/{uid}", s.handleRemoveMember)
+			r.Get("/shared", s.handleShared)
+			r.Get("/people", s.handlePeople)
 
 			r.Get("/resolve", s.handleResolve)
 			r.Get("/mentions", s.handleMentions)
@@ -311,6 +316,9 @@ func (s *Server) fail(w http.ResponseWriter, err error, context string) {
 	case errors.Is(err, store.ErrNotFound), errors.Is(err, storage.ErrNotFound):
 		writeErr(w, http.StatusNotFound, "not found")
 		return
+	case errors.Is(err, errReadOnlyShare), errors.Is(err, errOwnerOnly):
+		writeErr(w, http.StatusForbidden, err.Error())
+		return
 	case errors.Is(err, store.ErrConflict):
 		writeErr(w, http.StatusConflict, "already there")
 		return
@@ -397,7 +405,7 @@ func (s *Server) coreLoop(ctx context.Context) {
 func (s *Server) registerWithCore(ctx context.Context) error {
 	m := core.Manifest{
 		Slug: "notes", Name: "Pocket Notes",
-		Description: "Markdown notes kept as plain files where you choose (this server, a folder, WebDAV, your Nextcloud or your Pocket Files), with full-text search, tags, links between notes, tasks, daily notes, version history, trash, shared links, a rich editor with homelab tools, and Nextcloud Notes' own API for its apps.",
+		Description: "Markdown notes kept as plain files where you choose (this server, a folder, WebDAV, your Nextcloud or your Pocket Files), with full-text search, tags, links between notes, tasks, daily notes, version history, trash, sharing with people and public links, a rich editor with homelab tools, and Nextcloud Notes' own API for its apps.",
 		Icon:        "/favicon.svg", Version: Version,
 		URL: s.cfg.CoreAppURL, PublicURL: s.cfg.BaseURL, HealthPath: "/healthz", EnvPrefix: "NOTES",
 		Publishes: []string{"notes.created", "notes.updated", "notes.deleted"},

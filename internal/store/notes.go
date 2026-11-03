@@ -792,6 +792,7 @@ func (s *Store) NoteDashboard(ctx context.Context, userID int64) Dashboard {
 	_ = s.DB.QueryRowContext(ctx, `SELECT COUNT(1), COUNT(CASE WHEN modified >= ? THEN 1 END), COUNT(CASE WHEN modified >= ? THEN 1 END),
 		COALESCE(SUM(tasks_open), 0), COUNT(CASE WHEN favorite = 1 THEN 1 END), COUNT(DISTINCT category) FROM notes WHERE user_id = ?`,
 		day, day-6*86400, userID).Scan(&d.Notes, &d.EditedToday, &d.EditedWeek, &d.OpenTasks, &d.Favorites, &d.Folders)
+	d.Shared = s.CountSharedWithMe(ctx, userID)
 	return d
 }
 
@@ -803,7 +804,12 @@ func (s *Store) ChangeStamp(ctx context.Context, userID int64) string {
 	var fav int
 	_ = s.DB.QueryRowContext(ctx, `SELECT COUNT(1), MAX(updated_at), COALESCE(SUM(favorite + pinned * 2), 0) FROM notes WHERE user_id = ?`, userID).Scan(&n, &last, &fav)
 	_ = s.DB.QueryRowContext(ctx, `SELECT COUNT(1), MAX(deleted_at) FROM trash WHERE user_id = ?`, userID).Scan(&t, &trashLast)
-	return strconv.Itoa(n) + "|" + last.String + "|" + strconv.Itoa(fav) + "|" + strconv.Itoa(t) + "|" + trashLast.String
+	// Notes shared with them, and with whom theirs are shared, change their lists too.
+	var sh, edit int
+	var shLast sql.NullString
+	_ = s.DB.QueryRowContext(ctx, `SELECT COUNT(1), MAX(n.updated_at), COALESCE(SUM(m.can_edit), 0) FROM note_members m JOIN notes n ON n.id = m.note_id
+		WHERE m.user_id = ? OR m.owner_id = ?`, userID, userID).Scan(&sh, &shLast, &edit)
+	return strconv.Itoa(n) + "|" + last.String + "|" + strconv.Itoa(fav) + "|" + strconv.Itoa(t) + "|" + trashLast.String + "|" + strconv.Itoa(sh) + "|" + shLast.String + "|" + strconv.Itoa(edit)
 }
 
 // NotesContaining lists a person's notes whose text contains any of needles

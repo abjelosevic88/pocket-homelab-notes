@@ -86,6 +86,11 @@ func (s *Server) handleListNotes(w http.ResponseWriter, r *http.Request) {
 		s.fail(w, err, "list notes")
 		return
 	}
+	if counts := s.store.MemberCounts(ctx, uid); len(counts) > 0 {
+		for i := range notes {
+			notes[i].Shared = counts[notes[i].ID]
+		}
+	}
 	writeJSON(w, http.StatusOK, notes)
 }
 
@@ -208,8 +213,9 @@ func (s *Server) handleResolve(w http.ResponseWriter, r *http.Request) {
 // ---- one note ----
 
 func (s *Server) handleGetNote(w http.ResponseWriter, r *http.Request) {
-	ctx, uid, id := r.Context(), me(r), idParam(r, "id")
-	if _, err := s.store.GetNote(ctx, uid, id); err != nil {
+	ctx, id := r.Context(), idParam(r, "id")
+	uid, sf, err := s.noteAccess(ctx, me(r), id, false)
+	if err != nil {
 		s.fail(w, err, "get note")
 		return
 	}
@@ -220,8 +226,13 @@ func (s *Server) handleGetNote(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if !queryBool(r, "peek") {
-		s.store.TouchOpened(ctx, uid, id)
+		if sf == nil {
+			s.store.TouchOpened(ctx, uid, id)
+		} else {
+			s.store.TouchMemberOpened(ctx, id, me(r))
+		}
 	}
+	s.seenBy(ctx, n, sf)
 	writeJSON(w, http.StatusOK, n)
 }
 
@@ -278,15 +289,34 @@ func (s *Server) handleUpdateNote(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	ifMatch := firstNonEmpty(r.Header.Get("If-Match"), in.ETag)
-	n, err := s.updateNote(r.Context(), me(r), idParam(r, "id"), in.NoteInput, ifMatch, source(r))
+	ctx, id := r.Context(), idParam(r, "id")
+	uid, sf, err := s.noteAccess(ctx, me(r), id, true)
 	if err != nil {
 		s.fail(w, err, "save note")
 		return
 	}
+	if sf != nil {
+		// Its folder, star and pin are the owner's: someone it is shared with writes the text and title.
+		in.Category, in.Favorite, in.Pinned = nil, nil, nil
+	}
+	n, err := s.updateNote(ctx, uid, id, in.NoteInput, ifMatch, editSource(r, sf))
+	if err != nil {
+		var ce *conflictError
+		if errors.As(err, &ce) {
+			s.seenBy(ctx, ce.Note, sf)
+		}
+		s.fail(w, err, "save note")
+		return
+	}
+	s.seenBy(ctx, n, sf)
 	writeJSON(w, http.StatusOK, n)
 }
 
 func (s *Server) handleDeleteNote(w http.ResponseWriter, r *http.Request) {
+	if _, sf, err := s.noteAccess(r.Context(), me(r), idParam(r, "id"), false); err == nil && sf != nil {
+		s.fail(w, errOwnerOnly, "delete note")
+		return
+	}
 	if err := s.deleteNote(r.Context(), me(r), idParam(r, "id"), source(r)); err != nil {
 		s.fail(w, err, "delete note")
 		return
@@ -328,16 +358,23 @@ func (s *Server) handleAppendNote(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, http.StatusBadRequest, "text is required")
 		return
 	}
-	n, err := s.appendText(r.Context(), me(r), idParam(r, "id"), in.Text, source(r))
+	ctx, id := r.Context(), idParam(r, "id")
+	uid, sf, err := s.noteAccess(ctx, me(r), id, true)
 	if err != nil {
 		s.fail(w, err, "append")
 		return
 	}
+	n, err := s.appendText(ctx, uid, id, in.Text, editSource(r, sf))
+	if err != nil {
+		s.fail(w, err, "append")
+		return
+	}
+	s.seenBy(ctx, n, sf)
 	writeJSON(w, http.StatusOK, n)
 }
 
 func (s *Server) handleToggleTask(w http.ResponseWriter, r *http.Request) {
-	ctx, uid, id := r.Context(), me(r), idParam(r, "id")
+	ctx, id := r.Context(), idParam(r, "id")
 	var in struct {
 		Line int    `json:"line"`
 		Text string `json:"text"`
@@ -345,6 +382,11 @@ func (s *Server) handleToggleTask(w http.ResponseWriter, r *http.Request) {
 	}
 	if err := decode(r, &in); err != nil {
 		writeErr(w, http.StatusBadRequest, "invalid json")
+		return
+	}
+	uid, sf, err := s.noteAccess(ctx, me(r), id, true)
+	if err != nil {
+		s.fail(w, err, "task")
 		return
 	}
 	n, err := s.store.GetNote(ctx, uid, id)
@@ -357,23 +399,33 @@ func (s *Server) handleToggleTask(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, http.StatusConflict, "that task is not in the note any more")
 		return
 	}
-	out, err := s.updateNote(ctx, uid, id, NoteInput{Content: &content}, n.Hash, source(r))
+	out, err := s.updateNote(ctx, uid, id, NoteInput{Content: &content}, n.Hash, editSource(r, sf))
 	if err != nil {
 		s.fail(w, err, "task")
 		return
 	}
+	s.seenBy(ctx, out, sf)
 	writeJSON(w, http.StatusOK, out)
 }
 
 func (s *Server) handleDuplicateNote(w http.ResponseWriter, r *http.Request) {
-	ctx, uid := r.Context(), me(r)
-	n, err := s.store.GetNote(ctx, uid, idParam(r, "id"))
+	ctx, uid, id := r.Context(), me(r), idParam(r, "id")
+	owner, sf, err := s.noteAccess(ctx, uid, id, false)
 	if err != nil {
 		s.fail(w, err, "duplicate")
 		return
 	}
-	title := n.Title + " (copy)"
-	out, err := s.createNote(ctx, uid, NoteInput{Title: &title, Category: &n.Category, Content: &n.Content}, source(r))
+	n, err := s.store.GetNote(ctx, owner, id)
+	if err != nil {
+		s.fail(w, err, "duplicate")
+		return
+	}
+	// A note shared with them is copied into their own notes, in their default folder.
+	title, category := n.Title+" (copy)", &n.Category
+	if sf != nil {
+		title, category = n.Title, nil
+	}
+	out, err := s.createNote(ctx, uid, NoteInput{Title: &title, Category: category, Content: &n.Content}, source(r))
 	if err != nil {
 		s.fail(w, err, "duplicate")
 		return
@@ -383,6 +435,11 @@ func (s *Server) handleDuplicateNote(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) handleBacklinks(w http.ResponseWriter, r *http.Request) {
 	ctx, uid := r.Context(), me(r)
+	// The owner's other notes stay theirs: a note shared with someone links to nothing of theirs.
+	if _, sf, err := s.noteAccess(ctx, uid, idParam(r, "id"), false); err == nil && sf != nil {
+		writeJSON(w, http.StatusOK, map[string]any{"backlinks": []any{}, "mentions": []any{}})
+		return
+	}
 	n, err := s.store.GetNote(ctx, uid, idParam(r, "id"))
 	if err != nil {
 		s.fail(w, err, "backlinks")
@@ -400,7 +457,12 @@ func (s *Server) handleBacklinks(w http.ResponseWriter, r *http.Request) {
 // ---- versions ----
 
 func (s *Server) handleListVersions(w http.ResponseWriter, r *http.Request) {
-	ctx, uid, id := r.Context(), me(r), idParam(r, "id")
+	ctx, id := r.Context(), idParam(r, "id")
+	uid, _, err := s.noteAccess(ctx, me(r), id, false)
+	if err != nil {
+		s.fail(w, err, "versions")
+		return
+	}
 	if _, err := s.store.GetNote(ctx, uid, id); err != nil {
 		s.fail(w, err, "versions")
 		return
@@ -414,7 +476,12 @@ func (s *Server) handleListVersions(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) handleGetVersion(w http.ResponseWriter, r *http.Request) {
-	ctx, uid, id := r.Context(), me(r), idParam(r, "id")
+	ctx, id := r.Context(), idParam(r, "id")
+	uid, _, err := s.noteAccess(ctx, me(r), id, false)
+	if err != nil {
+		s.fail(w, err, "version")
+		return
+	}
 	n, err := s.store.GetNote(ctx, uid, id)
 	if err != nil {
 		s.fail(w, err, "version")
@@ -431,7 +498,12 @@ func (s *Server) handleGetVersion(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) handleRestoreVersion(w http.ResponseWriter, r *http.Request) {
-	ctx, uid, id := r.Context(), me(r), idParam(r, "id")
+	ctx, id := r.Context(), idParam(r, "id")
+	uid, sf, err := s.noteAccess(ctx, me(r), id, true)
+	if err != nil {
+		s.fail(w, err, "restore")
+		return
+	}
 	v, err := s.store.GetVersion(ctx, uid, id, idParam(r, "vid"))
 	if err != nil {
 		s.fail(w, err, "restore")
@@ -442,6 +514,7 @@ func (s *Server) handleRestoreVersion(w http.ResponseWriter, r *http.Request) {
 		s.fail(w, err, "restore")
 		return
 	}
+	s.seenBy(ctx, n, sf)
 	writeJSON(w, http.StatusOK, n)
 }
 
@@ -892,7 +965,12 @@ func (s *Server) storeAttachment(ctx context.Context, uid int64, n *store.Note, 
 }
 
 func (s *Server) handleUploadAttachment(w http.ResponseWriter, r *http.Request) {
-	ctx, uid := r.Context(), me(r)
+	ctx := r.Context()
+	uid, _, err := s.noteAccess(ctx, me(r), idParam(r, "id"), true)
+	if err != nil {
+		s.fail(w, err, "attachment")
+		return
+	}
 	n, err := s.store.GetNote(ctx, uid, idParam(r, "id"))
 	if err != nil {
 		s.fail(w, err, "attachment")
@@ -981,13 +1059,24 @@ func (s *Server) readNoteFile(ctx context.Context, uid int64, n *store.Note, lin
 }
 
 func (s *Server) handleGetAttachment(w http.ResponseWriter, r *http.Request) {
-	ctx, uid := r.Context(), me(r)
+	ctx := r.Context()
+	uid, sf, err := s.noteAccess(ctx, me(r), idParam(r, "id"), false)
+	if err != nil {
+		s.fail(w, err, "attachment")
+		return
+	}
 	n, err := s.store.GetNote(ctx, uid, idParam(r, "id"))
 	if err != nil {
 		s.fail(w, err, "attachment")
 		return
 	}
-	p, data, ent, err := s.readNoteFile(ctx, uid, n, r.URL.Query().Get("path"))
+	link := r.URL.Query().Get("path")
+	// Someone a note is shared with sees only the files the note itself links to, not the owner's others.
+	if sf != nil && (link == "" || (!strings.Contains(n.Content, link) && !strings.Contains(n.Content, encodeLink(link)))) {
+		writeErr(w, http.StatusNotFound, "not found")
+		return
+	}
+	p, data, ent, err := s.readNoteFile(ctx, uid, n, link)
 	if err != nil {
 		s.fail(w, err, "attachment")
 		return
@@ -1000,7 +1089,12 @@ func (s *Server) handleGetAttachment(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) handleDownloadNote(w http.ResponseWriter, r *http.Request) {
-	n, err := s.store.GetNote(r.Context(), me(r), idParam(r, "id"))
+	uid, _, err := s.noteAccess(r.Context(), me(r), idParam(r, "id"), false)
+	if err != nil {
+		s.fail(w, err, "download")
+		return
+	}
+	n, err := s.store.GetNote(r.Context(), uid, idParam(r, "id"))
 	if err != nil {
 		s.fail(w, err, "download")
 		return

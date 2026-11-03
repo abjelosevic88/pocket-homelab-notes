@@ -21,6 +21,8 @@ Add `X-Pocket-Source: shortcut` (or `app`) to have your changes named so in a no
 | `POST /notes/{id}/attachments` (multipart `file`) | `{path, markdown}` |
 | `GET /notes/{id}/attachment?path=` | a file the note links to |
 | `GET/POST /notes/{id}/shares {days?}`, `GET /shares`, `DELETE /shares/{id}` | public read-only links (`/s/<token>`) |
+| `GET /notes/{id}/members`, `POST /notes/{id}/members {user_id\|email, can_edit}`, `DELETE /notes/{id}/members/{uid}` | share with people on this server (owner adds/changes; a member can remove only themself) |
+| `GET /shared` → `{with_me, by_me}`, `GET /people` | the Shared view; who a note can be shared with. A shared note answers the usual `/notes/{id}…` routes for its members, with `shared_from` (read only unless `can_edit`) |
 | `GET /notes/{id}/download` | the Markdown file |
 
 ## Finding

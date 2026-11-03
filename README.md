@@ -96,6 +96,8 @@ Notes apps and the Pocket Homelab app work against it too.
   to today's note from the sidebar, a Shortcut, Raycast or `curl`.
 - **History**: every saved state, from any device, with a diff and restore. **Trash** for 30 days.
 - Favourites (Nextcloud's star, both ways), pins, recent, sort by edited / created / title.
+- **Share with people** on the same server, to read or to edit: they find it under **Shared** in the sidebar,
+  it stays your file in your storage, and their saves land in its history with their name.
 - **Share** a note as a read-only public link, with an end date if you like. Print / PDF, standalone
   HTML, `.md`, or the whole folder as a zip. Import Markdown files or a zip (Obsidian, Bear, Joplin).
 

@@ -30,7 +30,7 @@ function buildTree(folders: { path: string; count: number }[]): TreeNode[] {
   return root.children
 }
 
-export interface Dashboard { notes: number; edited_today: number; open_tasks: number; due_tasks: number }
+export interface Dashboard { notes: number; edited_today: number; open_tasks: number; due_tasks: number; shared?: number }
 
 /** The counts beside the views: they follow every change. */
 export function useDashboard() {
@@ -81,6 +81,7 @@ export function Sidebar({ onNew, onNavigate, onFolderMenu, onNewFolder, onSync, 
     { to: '/', label: 'All notes', icon: 'notes', active: onNotes && !params.toString(), count: dash?.notes, title: 'All notes (a)' },
     { to: '/?view=recent', label: 'Recent', icon: 'clock', active: onNotes && view === 'recent' },
     { to: '/?view=favorites', label: 'Favourites', icon: 'star', active: onNotes && view === 'favorites' },
+    { to: '/?view=shared', label: 'Shared', icon: 'users', active: onNotes && view === 'shared', count: dash?.shared, title: 'Notes shared with you, and yours you shared' },
     { to: '/tasks', label: 'Tasks', icon: 'check-square', active: loc.pathname === '/tasks', badge: dash?.due_tasks, count: dash?.open_tasks, title: 'Tasks (x)' },
     { to: '/calendar', label: 'Calendar', icon: 'calendar', active: loc.pathname === '/calendar', title: 'Calendar (c)' },
   ]

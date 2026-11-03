@@ -5,7 +5,7 @@ import { useApp } from '../lib/app-context'
 import type { Note } from '../lib/types'
 import { copyText } from '../lib/clipboard'
 import { Confirm, Field, Menu, type MenuItem, Modal, useToast } from './ui'
-import { MoveModal, ShareModal } from './NoteDialogs'
+import { MoveModal, PeopleModal, ShareModal } from './NoteDialogs'
 import { noteURL } from './NoteView'
 
 /** A change asked of a note from outside its editor (the list's right-click menu). */
@@ -31,7 +31,7 @@ export function NoteMenu({ note, x, y, onClose }: { note: Note; x: number; y: nu
   const { bump, settings } = useApp()
   const { toast } = useToast()
   const navigate = useNavigate()
-  const [sheet, setSheetRaw] = useState<'' | 'rename' | 'move' | 'share' | 'delete'>('')
+  const [sheet, setSheetRaw] = useState<'' | 'rename' | 'move' | 'share' | 'people' | 'delete'>('')
   const sheetRef = useRef<typeof sheet>('')
   const setSheet = (k: typeof sheet) => { sheetRef.current = k; setSheetRaw(k) }
   const [title, setTitle] = useState(note.title)
@@ -54,7 +54,18 @@ export function NoteMenu({ note, x, y, onClose }: { note: Note; x: number; y: nu
     } catch (e) { toast((e as Error).message, 'err') }
   }
   const open = (path: string) => { onClose(); navigate(`${path}${location.search}`) }
-  const items: MenuItem[] = [
+  const copyMine = async () => {
+    onClose()
+    try { const n = await api.post<Note>(`${V1}/notes/${note.id}/duplicate`); bump(); toast('Copied to your notes'); navigate(`/note/${n.id}`) } catch (e) { toast((e as Error).message, 'err') }
+  }
+  const items: MenuItem[] = note.shared_from ? [
+    { label: 'Open', icon: 'note', onSelect: () => open(`/note/${note.id}`) },
+    { label: 'Open in a new tab', icon: 'external', onSelect: () => window.open(`/note/${note.id}?view=shared`, '_blank') },
+    'sep',
+    { label: 'Who has it…', icon: 'users', onSelect: () => setSheet('people') },
+    { label: 'Copy to my notes', icon: 'copy', onSelect: copyMine },
+    { label: 'Download .md', icon: 'download', onSelect: () => { onClose(); location.href = `${V1}/notes/${note.id}/download` } },
+  ] : [
     { label: 'Open', icon: 'note', onSelect: () => open(`/note/${note.id}`) },
     { label: 'Open in a new tab', icon: 'external', onSelect: () => window.open(`/note/${note.id}`, '_blank') },
     'sep',
@@ -66,6 +77,7 @@ export function NoteMenu({ note, x, y, onClose }: { note: Note; x: number; y: nu
       onClose()
       try { const n = await api.post<Note>(`${V1}/notes/${note.id}/duplicate`); bump(); navigate(`/note/${n.id}${location.search}`) } catch (e) { toast((e as Error).message, 'err') }
     } },
+    { label: note.shared ? `Shared with ${note.shared} ${note.shared === 1 ? 'person' : 'people'}…` : 'Share with people…', icon: 'users', onSelect: () => setSheet('people') },
     { label: 'Share a link…', icon: 'share', onSelect: () => setSheet('share') },
     'sep',
     { label: 'Copy link', icon: 'link', onSelect: async () => { onClose(); const ok = await copyText(noteURL(note.id)); toast(ok ? 'Link copied' : 'Could not copy the link', ok ? 'ok' : 'err') } },
@@ -86,6 +98,7 @@ export function NoteMenu({ note, x, y, onClose }: { note: Note; x: number; y: nu
       </Modal>}
       {sheet === 'move' && <MoveModal current={note.category} onClose={onClose} onMove={cat => run({ kind: 'patch', body: { category: cat }, msg: `Moved to ${cat || 'Notes'}` }, `Moved to ${cat || 'Notes'}`)} />}
       {sheet === 'share' && <ShareModal note={note} onClose={onClose} />}
+      {sheet === 'people' && <PeopleModal note={note} onClose={() => { onClose(); bump() }} />}
       {sheet === 'delete' && <Confirm title={`Delete “${note.title}”?`} message={<>It goes to the trash (Trash in the sidebar) for {settings?.trash_days ?? 30} days{settings?.storage_kind === 'nextcloud' ? ', and to Nextcloud’s own trash bin' : ''}.</>} onCancel={onClose} onConfirm={() => run({ kind: 'delete' }, 'Moved to the trash')} />}
     </>
   )

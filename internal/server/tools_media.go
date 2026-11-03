@@ -313,7 +313,13 @@ func (s *Server) handleToolPhotosAttach(w http.ResponseWriter, r *http.Request) 
 		writeErr(w, http.StatusBadRequest, "invalid json")
 		return
 	}
-	n, err := s.store.GetNote(ctx, uid, in.NoteID)
+	// A note shared with them for writing takes pictures too: they go to its owner's folder.
+	owner, _, err := s.noteAccess(ctx, uid, in.NoteID, true)
+	if err != nil {
+		s.fail(w, err, "photos")
+		return
+	}
+	n, err := s.store.GetNote(ctx, owner, in.NoteID)
 	if err != nil {
 		s.fail(w, err, "photos")
 		return
@@ -357,7 +363,7 @@ func (s *Server) handleToolPhotosAttach(w http.ResponseWriter, r *http.Request) 
 		if err != nil {
 			return "", err
 		}
-		rel, err := s.storeAttachment(ctx, uid, n, name, data)
+		rel, err := s.storeAttachment(ctx, owner, n, name, data)
 		if err != nil {
 			return "", err
 		}
@@ -627,7 +633,13 @@ func (s *Server) handleToolFilesAttach(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, http.StatusBadRequest, "invalid json")
 		return
 	}
-	n, err := s.store.GetNote(ctx, uid, in.NoteID)
+	// A note shared with them for writing takes pictures too: they go to its owner's folder.
+	owner, _, err := s.noteAccess(ctx, uid, in.NoteID, true)
+	if err != nil {
+		s.fail(w, err, "files")
+		return
+	}
+	n, err := s.store.GetNote(ctx, owner, in.NoteID)
 	if err != nil {
 		s.fail(w, err, "files")
 		return
@@ -677,7 +689,7 @@ func (s *Server) handleToolFilesAttach(w http.ResponseWriter, r *http.Request) {
 		toolErr(w, err)
 		return
 	}
-	rel, err := s.storeAttachment(ctx, uid, n, f.Name, data)
+	rel, err := s.storeAttachment(ctx, owner, n, f.Name, data)
 	if err != nil {
 		s.fail(w, err, "files")
 		return

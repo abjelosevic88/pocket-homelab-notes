@@ -372,3 +372,18 @@ a.welcome-stat:hover { border-color: var(--border-strong); }
 .embed-note > .note-view { flex: 1; min-height: 0; }
 .embed-closed { align-items: center; justify-content: center; gap: 8px; color: var(--muted); }
 .embed-note .note-view .note-head { padding-left: 16px; }
+
+/* sharing with people */
+.shared-mark { color: var(--accent-ink); }
+.shared-chip { background: var(--accent-soft); color: var(--accent-ink); }
+.share-perm { display: inline-flex; align-items: center; gap: 4px; margin-left: 8px; padding: 0 6px; border-radius: 5px; font-size: 11px; background: var(--surface-2); color: var(--muted); }
+.share-perm.edit { background: var(--accent-soft); color: var(--accent-ink); }
+button.share-perm { border: 0; cursor: pointer; font: inherit; font-size: 11px; }
+button.share-perm:hover { color: var(--text); }
+.share-add { align-items: center; }
+.member-list { list-style: none; margin: 4px 0 0; padding: 0; }
+.member-list li { display: flex; align-items: center; gap: 10px; padding: 9px 2px; border-bottom: 1px solid var(--hairline); }
+.member-list li:last-child { border-bottom: 0; }
+.member-list .avatar { width: 30px; height: 30px; font-size: 12px; }
+.member-list .grow { display: flex; flex-direction: column; min-width: 0; }
+.member-list small { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

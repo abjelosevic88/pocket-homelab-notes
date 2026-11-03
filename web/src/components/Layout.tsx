@@ -153,6 +153,7 @@ function TopBar({ onMenu, onPalette, mobile, compact, sidebarOpen }: { onMenu: (
     const sep = <Icon name="chevron-right" size={16} className="crumb-sep" />
     if (q) title = 'Search'
     else if (view === 'favorites') title = 'Favourites'
+    else if (view === 'shared') title = 'Shared'
     else if (view === 'recent') title = 'Recent'
     else if (tag) title = <><button type="button" className="crumb" onClick={() => navigate('/')}>Notes</button>{sep}<span className="ellipsis">#{tag}</span></>
     else if (folder != null) {

@@ -647,6 +647,11 @@ func (s *Server) syncLocked(ctx context.Context, l *library, force bool) (SyncSt
 }
 
 func (s *Server) notifyUser(uid int64, title, body string) {
+	s.notifyUserAt(uid, title, body, s.cfg.BaseURL)
+}
+
+// notifyUserAt is notifyUser with the page the notification opens.
+func (s *Server) notifyUserAt(uid int64, title, body, link string) {
 	go func() {
 		ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 		defer cancel()
@@ -658,7 +663,7 @@ func (s *Server) notifyUser(uid int64, title, body string) {
 		if u == "" {
 			return
 		}
-		if err := notify.Send(ctx, kind, u, tok, title, body, s.cfg.BaseURL); err != nil {
+		if err := notify.Send(ctx, kind, u, tok, title, body, link); err != nil {
 			s.log.Warn("notify", "err", err)
 		}
 	}()

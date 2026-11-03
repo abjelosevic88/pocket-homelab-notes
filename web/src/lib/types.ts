@@ -20,7 +20,16 @@ export interface Note {
   opened_at?: string
   created_at: string
   updated_at: string
+  /** Someone else's note shared with me: whose, and whether I may edit it. */
+  shared_from?: SharedFrom
+  /** My note: how many people it is shared with. */
+  shared?: number
+  members?: Member[]
 }
+
+export interface SharedFrom { owner_id: number; name: string; email: string; can_edit: boolean }
+export interface Member { user_id: number; name: string; email: string; can_edit: boolean; created_at?: string }
+export interface PersonOnBox { id: number; name: string; email: string }
 
 export interface SearchHit extends Note { snippet: string; rank: number }
 export interface Folder { path: string; count: number }

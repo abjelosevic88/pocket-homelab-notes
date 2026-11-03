@@ -1,11 +1,12 @@
 import { useEffect, useState } from 'react'
 import { api, V1 } from '../lib/api'
 import { useApp } from '../lib/app-context'
-import type { DiffOp, Note, Share, Version } from '../lib/types'
-import { ago, stamp } from '../lib/format'
+import type { DiffOp, Member, Note, PersonOnBox, Share, Version } from '../lib/types'
+import { ago, colorFor, initials, stamp } from '../lib/format'
 import { copyText } from '../lib/clipboard'
 import { Confirm, Loading, Modal, Segmented, useToast } from './ui'
 import { Icon } from './icons'
+import { Select } from './Select'
 
 const SOURCES: Record<string, string> = { web: 'Here', api: 'API', 'nextcloud-api': 'Nextcloud Notes app', sync: 'Changed in the folder', restore: 'Restored', import: 'First seen', capture: 'Quick capture', daily: 'Daily note', app: 'Pocket Homelab app', shortcut: 'Shortcut' }
 
@@ -108,6 +109,67 @@ export function MoveModal({ current, onMove, onClose }: { current: string; onMov
           </button>
         ))}
       </div>
+    </Modal>
+  )
+}
+
+const personName = (p: { name: string; email: string }) => p.name || p.email
+
+/** Share a note with people on this server: they find it under Shared, to read or to edit. */
+export function PeopleModal({ note, onClose, onChanged }: { note: Note; onClose: () => void; onChanged?: (count: number) => void }) {
+  const { toast } = useToast()
+  const [data, setData] = useState<{ owner: Member; members: Member[]; mine: boolean } | null>(null)
+  const [people, setPeople] = useState<PersonOnBox[] | null>(null)
+  const [pick, setPick] = useState<number | null>(null)
+  const [edit, setEdit] = useState(true)
+  const [busy, setBusy] = useState(false)
+  const load = () => api.get<{ owner: Member; members: Member[]; mine: boolean }>(`${V1}/notes/${note.id}/members`).then(d => { setData(d); onChanged?.(d.members.length) })
+  useEffect(() => {
+    load().catch(e => toast((e as Error).message, 'err'))
+    api.get<PersonOnBox[]>(`${V1}/people`).then(setPeople).catch(() => setPeople([]))
+  }, [note.id]) // eslint-disable-line react-hooks/exhaustive-deps
+  const set = async (body: { user_id: number; can_edit: boolean }, msg?: string) => {
+    setBusy(true)
+    try {
+      const d = await api.post<{ owner: Member; members: Member[]; mine: boolean }>(`${V1}/notes/${note.id}/members`, body)
+      setData(d); onChanged?.(d.members.length); if (msg) toast(msg)
+    } catch (e) { toast((e as Error).message, 'err') } finally { setBusy(false) }
+  }
+  const remove = async (m: Member) => {
+    try { await api.del(`${V1}/notes/${note.id}/members/${m.user_id}`); await load(); toast(`${personName(m)} no longer has it`) } catch (e) { toast((e as Error).message, 'err') }
+  }
+  const taken = new Set((data?.members || []).map(m => m.user_id))
+  const free = (people || []).filter(p => !taken.has(p.id))
+  const mine = data?.mine
+  return (
+    <Modal title="Share with people" onClose={onClose}>
+      <p className="muted">People on this server find the note under <b>Shared</b> in their sidebar. It stays your note, in your folder: what they write lands here, with their name in its history.</p>
+      {!data ? <Loading /> : <>
+        {mine && (people && free.length === 0
+          ? <p className="muted small mb">{people.length === 0 ? 'Nobody else has signed in to Pocket Notes yet. Once they have, they show up here.' : 'It is shared with everyone on this server.'}</p>
+          : <div className="row wrap mb share-add">
+              <Select searchable className="grow" label="Person" placeholder="Choose a person…" value={pick ?? 0} onChange={v => setPick(v)} width={300}
+                options={free.map(p => ({ value: p.id, label: p.name ? `${p.name} · ${p.email}` : p.email }))} />
+              <Segmented size="sm" label="They can" value={edit ? 'edit' : 'read'} onChange={v => setEdit(v === 'edit')} options={[{ value: 'edit', label: 'Can edit' }, { value: 'read', label: 'Can read' }]} />
+              <button type="button" className="btn primary" disabled={!pick || busy} onClick={async () => { if (pick) { const p = free.find(x => x.id === pick); await set({ user_id: pick, can_edit: edit }, `Shared with ${p ? personName(p) : 'them'}`); setPick(null) } }}><Icon name="users" size={15} />Share</button>
+            </div>)}
+        <ul className="member-list">
+          <li><span className="avatar" style={{ background: colorFor(data.owner.user_id) }}>{initials(personName(data.owner))}</span><span className="grow"><b>{personName(data.owner)}</b>{data.owner.name && <small className="muted">{data.owner.email}</small>}</span><span className="muted small">Owner</span></li>
+          {data.members.map(m => (
+            <li key={m.user_id}>
+              <span className="avatar" style={{ background: colorFor(m.user_id) }}>{initials(personName(m))}</span>
+              <span className="grow"><b>{personName(m)}</b>{m.name && <small className="muted">{m.email}</small>}</span>
+              {mine
+                ? <>
+                    <Segmented size="sm" label={`What ${personName(m)} can do`} value={m.can_edit ? 'edit' : 'read'} onChange={v => set({ user_id: m.user_id, can_edit: v === 'edit' })} options={[{ value: 'edit', label: 'Edit' }, { value: 'read', label: 'Read' }]} />
+                    <button type="button" className="btn ghost icon-only sm" title={`Stop sharing with ${personName(m)}`} aria-label={`Stop sharing with ${personName(m)}`} onClick={() => remove(m)}><Icon name="x" size={15} /></button>
+                  </>
+                : <span className="muted small">{m.can_edit ? 'Can edit' : 'Can read'}</span>}
+            </li>
+          ))}
+        </ul>
+        {data.members.length === 0 && <p className="muted small">Not shared with anyone yet.</p>}
+      </>}
     </Modal>
   )
 }

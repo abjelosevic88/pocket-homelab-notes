@@ -45,6 +45,11 @@ type Note struct {
 	OpenedAt   string   `json:"opened_at,omitempty"`
 	CreatedAt  string   `json:"created_at"`
 	UpdatedAt  string   `json:"updated_at"`
+	// Sharing with people on this server: SharedFrom for the person it was
+	// shared with, Shared (how many) and Members for its owner.
+	SharedFrom *SharedFrom `json:"shared_from,omitempty"`
+	Shared     int         `json:"shared,omitempty"`
+	Members    []Member    `json:"members,omitempty"`
 }
 
 // NoteFilter narrows ListNotes.
@@ -178,4 +183,5 @@ type Dashboard struct {
 	Storage     string `json:"storage"`
 	LastSync    string `json:"last_sync"`
 	SyncError   string `json:"sync_error,omitempty"`
+	Shared      int    `json:"shared"` // notes other people shared with them
 }
