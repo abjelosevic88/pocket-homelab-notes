@@ -114,6 +114,9 @@ export const contextMenu = $prose((ctx) => {
               heading('Homelab')
               item('Make this line a task…', () => post('tool', Object.assign({ tool: 'task' }, line)))
             }
+            // One of the owner's templates, put in where they clicked (the app's picker, as `/` → My templates).
+            heading('Insert')
+            item('Template…', () => post('templates'))
           }
           heading('History')
           command('Undo', undo); command('Redo', redo)
