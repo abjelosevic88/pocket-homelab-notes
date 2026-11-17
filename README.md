@@ -27,25 +27,28 @@ Notes apps and the Pocket Homelab app work against it too.
 <table>
   <tr>
     <td width="50%"><img src="docs/screenshots/slash.png" alt="The / menu: blocks, diagrams, templates, homelab tools"></td>
+    <td width="50%"><img src="docs/screenshots/templates.png" alt="Templates: save a note as one, start a new note from it in one click"></td>
+  </tr>
+  <tr>
     <td width="50%"><img src="docs/screenshots/markdown.png" alt="The same note as Markdown source"></td>
-  </tr>
-  <tr>
     <td width="50%"><img src="docs/screenshots/history.png" alt="History: every change, with a diff and restore"></td>
+  </tr>
+  <tr>
     <td width="50%"><img src="docs/screenshots/switcher.png" alt="⌘K: find by title or by what a note says"></td>
-  </tr>
-  <tr>
     <td width="50%"><img src="docs/screenshots/tasks.png" alt="Tasks: every checkbox in every note, by due date"></td>
-    <td width="50%"><img src="docs/screenshots/calendar.png" alt="Daily notes on a calendar"></td>
   </tr>
   <tr>
+    <td width="50%"><img src="docs/screenshots/calendar.png" alt="Daily notes on a calendar"></td>
     <td width="50%"><img src="docs/screenshots/storage.png" alt="Storage: on the server, Nextcloud, WebDAV or a folder"></td>
+  </tr>
+  <tr>
     <td width="50%"><img src="docs/screenshots/integrations.png" alt="Integrations through Pocket Core or typed in"></td>
+    <td width="50%"><img src="docs/screenshots/dark.png" alt="Dark mode"></td>
   </tr>
 </table>
 <p align="center">
   <img src="docs/screenshots/mobile-list.png" width="260" alt="The list on a phone">&nbsp;&nbsp;
-  <img src="docs/screenshots/mobile-note.png" width="260" alt="A note on a phone">&nbsp;&nbsp;
-  <img src="docs/screenshots/dark.png" width="420" alt="Dark mode">
+  <img src="docs/screenshots/mobile-note.png" width="260" alt="A note on a phone">
 </p>
 
 ## What it does
