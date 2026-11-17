@@ -94,6 +94,11 @@ Notes apps and the Pocket Homelab app work against it too.
   them from the list.
 - **Daily notes** in your own folder, title format and template; a calendar of them; **capture**
   to today's note from the sidebar, a Shortcut, Raycast or `curl`.
+- **Templates**: save any note as a template (or make a blank one) and start a new note from it in
+  one step (the template button beside New note, or ⇧N). Each template sets the title of its notes
+  (`{{date:YYMMDD}} {{name}}` → `261104 Meeting`) and the folder they go to; share one with everyone
+  on the server. Placeholders: `{{date}}` (or any format, `{{date:DD.MM.YYYY}}`), `{{time}}`,
+  `{{weekday}}`, `{{week}}`, `{{title}}`, `{{name}}` and more.
 - **History**: every saved state, from any device, with a diff and restore. **Trash** for 30 days.
 - Favourites (Nextcloud's star, both ways), pins, recent, sort by edited / created / title.
 - **Share with people** on the same server, to read or to edit: they find it under **Shared** in the sidebar,

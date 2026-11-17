@@ -3,7 +3,7 @@ import { Modal } from './ui'
 const GROUPS: { title: string; keys: [string[], string][] }[] = [
   { title: 'Go to', keys: [[['t'], 'Today'], [['a'], 'All notes'], [['x'], 'Tasks'], [['c'], 'Calendar'], [[','], 'Settings'], [['⌘', '⇧', 'D'], 'Today, from anywhere']] },
   { title: 'Find', keys: [[['⌘', 'K'], 'Find a note or run a command'], [['/'], 'The same, when nothing is typed']] },
-  { title: 'Write', keys: [[['n'], 'New note'], [['Alt', 'N'], 'New note, from anywhere'], [['⌘', 'S'], 'Save now'], [['/'], 'In a note: blocks and homelab tools'], [['[', '['], 'In a note: link another note'], [['@'], 'In a note: a person from Pocket Contacts']] },
+  { title: 'Write', keys: [[['n'], 'New note'], [['Alt', 'N'], 'New note, from anywhere'], [['⇧', 'N'], 'New note from a template'], [['⌘', 'S'], 'Save now'], [['/'], 'In a note: blocks and homelab tools'], [['[', '['], 'In a note: link another note'], [['@'], 'In a note: a person from Pocket Contacts']] },
   { title: 'Window', keys: [[['['], 'Show or hide the sidebar'], [['esc'], 'Close a dialog or menu'], [['?'], 'This sheet']] },
 ]
 

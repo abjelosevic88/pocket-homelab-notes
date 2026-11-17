@@ -15,12 +15,13 @@ import { exportHTML, printNote } from '../lib/export'
 import { copyText } from '../lib/clipboard'
 import type { NoteAction } from './NoteMenu'
 import { AskButton } from './AskButton'
+import { TemplateBanner, TemplateForm, TemplateSettings, isTemplateNote } from './Templates'
 
 type Status = 'saved' | 'dirty' | 'saving' | 'error' | 'conflict' | 'offline'
 type Sheet =
   | { kind: 'link' } | { kind: 'bookmark' } | { kind: 'draw' } | { kind: 'photos' } | { kind: 'files' } | { kind: 'habits' } | { kind: 'voice' } | { kind: 'templates' }
   | { kind: 'task'; line: Line | null } | { kind: 'expense'; line: Line | null } | { kind: 'diagram'; svg: string }
-  | { kind: 'history' } | { kind: 'share' } | { kind: 'people' } | { kind: 'move' } | { kind: 'delete' } | { kind: 'leave' }
+  | { kind: 'history' } | { kind: 'share' } | { kind: 'people' } | { kind: 'move' } | { kind: 'delete' } | { kind: 'leave' } | { kind: 'save-template' } | { kind: 'template-settings' }
 type Line = { text: string; from?: number }
 
 const REPORTS: Record<string, string> = { snapshot: 'the homelab', attention: 'what needs attention', media: 'this week’s viewing and listening', spent: 'this month’s spending', fuel: 'the vehicle log', hosts: 'the network', processes: 'the server' }
@@ -413,6 +414,7 @@ const NoteView = forwardRef<NoteViewHandle, { id: number; onBack?: () => void; e
     ...(phone() ? [{ label: 'Outline and info', icon: 'panel-right', onSelect: () => setPanel('outline') }, 'sep' as const] : []),
     { label: 'Who has it…', icon: 'users', onSelect: () => setSheet({ kind: 'people' }) },
     { label: 'History…', icon: 'history', onSelect: () => setSheet({ kind: 'history' }) },
+    { label: 'Save as template…', icon: 'template', onSelect: () => setSheet({ kind: 'save-template' }) },
     { label: 'Copy to my notes', icon: 'copy', onSelect: async () => { try { const n = await api.post<Note>(`${V1}/notes/${note.id}/duplicate`); bump(); toast('Copied to your notes'); navigate(`/note/${n.id}`) } catch (e) { toast((e as Error).message, 'err') } } },
     'sep',
     { label: 'Copy link', icon: 'link', onSelect: async () => { const ok = await copyText(`${location.origin}/note/${note.id}?view=shared`); toast(ok ? 'Link copied' : 'Could not copy the link', ok ? 'ok' : 'err') } },
@@ -433,6 +435,9 @@ const NoteView = forwardRef<NoteViewHandle, { id: number; onBack?: () => void; e
     { label: 'History…', icon: 'history', onSelect: () => setSheet({ kind: 'history' }) },
     { label: 'Move to…', icon: 'move', onSelect: () => setSheet({ kind: 'move' }) },
     { label: 'Duplicate', icon: 'copy', onSelect: async () => { try { const n = await api.post<Note>(`${V1}/notes/${note.id}/duplicate`); bump(); navigate(`/note/${n.id}${location.search}`) } catch (e) { toast((e as Error).message, 'err') } } },
+    isTemplateNote(note, settings?.templates_folder)
+      ? { label: 'Template settings…', icon: 'template', onSelect: () => setSheet({ kind: 'template-settings' }) }
+      : { label: 'Save as template…', icon: 'template', onSelect: () => setSheet({ kind: 'save-template' }) },
     'sep',
     { label: 'Copy link', icon: 'link', onSelect: async () => { const ok = await copyText(noteURL(note.id)); toast(ok ? 'Link copied' : 'Could not copy the link', ok ? 'ok' : 'err') } },
     { label: 'Download .md', icon: 'download', onSelect: () => { location.href = `${V1}/notes/${note.id}/download` } },
@@ -482,6 +487,8 @@ const NoteView = forwardRef<NoteViewHandle, { id: number; onBack?: () => void; e
       </header>
 
       {note.tags.length > 0 && <div className="note-tags">{note.tags.map(t => <Link key={t} to={`/?tag=${encodeURIComponent(t)}`} className="tag">#{t}</Link>)}</div>}
+
+      {isTemplateNote(note, settings?.templates_folder) && !embedded && <TemplateBanner note={note} />}
 
       {conflict && <div className="callout warning conflict">
         <Icon name="alert" size={15} />
@@ -537,6 +544,8 @@ const NoteView = forwardRef<NoteViewHandle, { id: number; onBack?: () => void; e
       {sheet?.kind === 'habits' && <HabitsSheet onClose={() => setSheet(null)} onDone={m => { setSheet(null); put(m, 'block') }} />}
       {sheet?.kind === 'voice' && <VoiceMemo upload={async f => (await uploadFiles([f]))[0] || ''} onClose={() => setSheet(null)} onDone={m => { setSheet(null); put(m, 'block') }} />}
       {sheet?.kind === 'templates' && <TemplatePicker title={note.title} onClose={() => setSheet(null)} onPick={m => { setSheet(null); if (mode === 'rich') rich.current?.insertTemplate(m); else put(m, 'block') }} />}
+      {sheet?.kind === 'save-template' && <TemplateForm fromNote={{ ...note, content: draft }} onClose={() => setSheet(null)} />}
+      {sheet?.kind === 'template-settings' && <TemplateSettings id={note.id} onClose={() => setSheet(null)} />}
       {sheet?.kind === 'diagram' && <DiagramViewer svg={sheet.svg} onClose={() => setSheet(null)} />}
       {sheet?.kind === 'history' && <HistoryModal note={note} onClose={() => setSheet(null)} onRestored={n => { const c = cur.current; c.etag = n.etag; c.saved = n.content || ''; c.draft = c.saved; setNote(n); setDraft(c.saved); setRevision(r => r + 1); setSheet(null); toast('Restored') }} />}
       {sheet?.kind === 'share' && <ShareModal note={note} onClose={() => setSheet(null)} />}

@@ -626,18 +626,42 @@ func dateLayout(st store.Settings) string {
 		return "02.01.2006"
 	case "long":
 		return "Monday, 2 January 2006"
+	case "yymmdd":
+		return "060102"
 	}
 	return "2006-01-02"
 }
 
-var placeholderRe = regexp.MustCompile(`\{\{\s*(date|today|time|now|iso|weekday|title|tomorrow|yesterday)\s*\}\}`)
+var placeholderRe = regexp.MustCompile(`\{\{\s*(date|today|time|now|iso|weekday|title|tomorrow|yesterday|name|week|year|month)(?:\s*:\s*([^{}]*?))?\s*\}\}`)
 
 // fillTemplate fills {{date}}, {{time}}, {{now}}, {{iso}}, {{weekday}},
 // {{title}}, {{tomorrow}} and {{yesterday}} in.
 func fillTemplate(tpl, title string, at time.Time, st store.Settings) string {
+	return fillPlaceholders(tpl, title, "", at, st)
+}
+
+// fillPlaceholders fills a template's placeholders: the dates in the
+// person's date format or one of their own ({{date:YYMMDD}} → 261104),
+// {{time}}, {{now}}, {{weekday}}, {{week}}, {{month}}, {{year}}, the new
+// note's {{title}} and the template's {{name}}. Others stay as they are.
+func fillPlaceholders(tpl, title, name string, at time.Time, st store.Settings) string {
 	layout := dateLayout(st)
 	return placeholderRe.ReplaceAllStringFunc(tpl, func(m string) string {
-		key := placeholderRe.FindStringSubmatch(m)[1]
+		sub := placeholderRe.FindStringSubmatch(m)
+		key, format := sub[1], strings.TrimSpace(sub[2])
+		day := at
+		switch key {
+		case "tomorrow":
+			day = at.AddDate(0, 0, 1)
+		case "yesterday":
+			day = at.AddDate(0, 0, -1)
+		}
+		if format != "" {
+			switch key {
+			case "date", "today", "tomorrow", "yesterday", "now", "time", "iso":
+				return formatDate(day, format)
+			}
+		}
 		switch key {
 		case "time":
 			return at.Format("15:04")
@@ -649,13 +673,58 @@ func fillTemplate(tpl, title string, at time.Time, st store.Settings) string {
 			return at.Format("Monday")
 		case "title":
 			return title
-		case "tomorrow":
-			return at.AddDate(0, 0, 1).Format(layout)
-		case "yesterday":
-			return at.AddDate(0, 0, -1).Format(layout)
+		case "name":
+			return name
+		case "week":
+			_, w := at.ISOWeek()
+			return strconv.Itoa(w)
+		case "month":
+			return at.Format("January")
+		case "year":
+			return at.Format("2006")
 		}
-		return at.Format(layout)
+		return day.Format(layout)
 	})
+}
+
+// dateTokens are what {{date:…}} understands, longest first; anything else
+// is written as it is.
+var dateTokens = []struct {
+	tok    string
+	layout string
+}{
+	{"YYYY", "2006"}, {"MMMM", "January"}, {"dddd", "Monday"}, {"MMM", "Jan"}, {"ddd", "Mon"},
+	{"YY", "06"}, {"MM", "01"}, {"DD", "02"}, {"HH", "15"}, {"mm", "04"}, {"ss", "05"},
+	{"M", "1"}, {"D", "2"},
+}
+
+// formatDate writes t as format says: YYYY, YY, MMMM, MMM, MM, M, DD, D,
+// dddd, ddd, HH, mm, ss; [text] stays as written.
+func formatDate(t time.Time, format string) string {
+	var b strings.Builder
+	for i := 0; i < len(format); {
+		if format[i] == '[' {
+			if j := strings.IndexByte(format[i:], ']'); j > 0 {
+				b.WriteString(format[i+1 : i+j])
+				i += j + 1
+				continue
+			}
+		}
+		matched := false
+		for _, d := range dateTokens {
+			if strings.HasPrefix(format[i:], d.tok) {
+				b.WriteString(t.Format(d.layout))
+				i += len(d.tok)
+				matched = true
+				break
+			}
+		}
+		if !matched {
+			b.WriteByte(format[i])
+			i++
+		}
+	}
+	return b.String()
 }
 
 func parseDay(v string) (time.Time, error) {
@@ -827,35 +896,6 @@ func (s *Server) handleCapture(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, http.StatusOK, n)
-}
-
-func (s *Server) handleTemplates(w http.ResponseWriter, r *http.Request) {
-	ctx, uid := r.Context(), me(r)
-	st, _ := s.store.GetSettings(ctx, uid)
-	folder := notesmd.SafeFolder(st.TemplatesFolder)
-	if folder == "" {
-		writeJSON(w, http.StatusOK, []store.Note{})
-		return
-	}
-	notes, err := s.store.ListNotes(ctx, uid, store.NoteFilter{Category: &folder, Recursive: true, Sort: "title"})
-	if err != nil {
-		s.fail(w, err, "templates")
-		return
-	}
-	writeJSON(w, http.StatusOK, notes)
-}
-
-// handleTemplate gives one template with its placeholders filled in for the
-// note it goes into (?title=), as the daily note's template is.
-func (s *Server) handleTemplate(w http.ResponseWriter, r *http.Request) {
-	ctx, uid := r.Context(), me(r)
-	n, err := s.store.GetNote(ctx, uid, idParam(r, "id"))
-	if err != nil {
-		s.fail(w, err, "template")
-		return
-	}
-	st, _ := s.store.GetSettings(ctx, uid)
-	writeJSON(w, http.StatusOK, map[string]string{"title": n.Title, "content": fillTemplate(n.Content, r.URL.Query().Get("title"), time.Now(), st)})
 }
 
 // ---- trash ----

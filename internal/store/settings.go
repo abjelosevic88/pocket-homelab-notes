@@ -69,7 +69,7 @@ func (s *Store) GetSettings(ctx context.Context, userID int64) (Settings, error)
 		case "spellcheck":
 			st.SpellCheck = v != "0"
 		case "date_format":
-			if v == "iso" || v == "dmy-dot" || v == "long" {
+			if v == "iso" || v == "dmy-dot" || v == "long" || v == "yymmdd" {
 				st.DateFormat = v
 			}
 		case "daily_folder":

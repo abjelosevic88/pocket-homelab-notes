@@ -31,6 +31,21 @@ export interface SharedFrom { owner_id: number; name: string; email: string; can
 export interface Member { user_id: number; name: string; email: string; can_edit: boolean; created_at?: string }
 export interface PersonOnBox { id: number; name: string; email: string }
 
+/** A note in the templates folder, with what notes made from it get (GET /api/v1/templates). */
+export interface Template extends Note {
+  name: string
+  /** The title of a new note; {{date}} and friends allowed. "" = the name. */
+  title_pattern: string
+  /** Where new notes go; "" = the folder being looked at, else the default one. */
+  folder: string
+  /** Everyone on this server may use it. */
+  everyone: boolean
+  /** Someone else's, shared with everyone. */
+  owner?: { owner_id: number; name: string; email: string }
+  /** The title a note made from it now gets. */
+  next_title: string
+}
+
 export interface SearchHit extends Note { snippet: string; rank: number }
 export interface Folder { path: string; count: number }
 export interface TagCount { tag: string; count: number }
@@ -53,7 +68,7 @@ export interface Settings {
   title_from_first_line: boolean
   sort_by: 'modified' | 'title' | 'created'
   spellcheck: boolean
-  date_format: 'iso' | 'dmy-dot' | 'long'
+  date_format: 'iso' | 'dmy-dot' | 'long' | 'yymmdd'
   daily_folder: string
   daily_format: string
   daily_template: string

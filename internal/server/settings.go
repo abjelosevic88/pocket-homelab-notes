@@ -84,7 +84,7 @@ func (s *Server) handlePutSettings(w http.ResponseWriter, r *http.Request) {
 	if st.SortBy != "title" && st.SortBy != "created" {
 		st.SortBy = "modified"
 	}
-	if st.DateFormat != "dmy-dot" && st.DateFormat != "long" {
+	if st.DateFormat != "dmy-dot" && st.DateFormat != "long" && st.DateFormat != "yymmdd" {
 		st.DateFormat = "iso"
 	}
 	st.DefaultFolder = notesmd.SafeFolder(st.DefaultFolder)

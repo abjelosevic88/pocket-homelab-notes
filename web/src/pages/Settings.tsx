@@ -142,7 +142,7 @@ function Writing() {
         </SettingRow>
         <SettingRow title="Spell check"><Switch checked={f.spellcheck} onChange={v => setF({ ...f, spellcheck: v })} label="Spell check" /></SettingRow>
         <SettingRow title="Dates in templates">
-          <Select value={f.date_format} onChange={v => setF({ ...f, date_format: v })} label="Dates in templates" options={[{ value: 'iso', label: '2026-10-20' }, { value: 'dmy-dot', label: '20.10.2026' }, { value: 'long', label: 'Tuesday, 20 October 2026' }]} />
+          <Select value={f.date_format} onChange={v => setF({ ...f, date_format: v })} label="Dates in templates" options={[{ value: 'iso', label: '2026-10-20' }, { value: 'dmy-dot', label: '20.10.2026' }, { value: 'long', label: 'Tuesday, 20 October 2026' }, { value: 'yymmdd', label: '261020' }]} />
         </SettingRow>
       </Section>
       <Section title="New notes">

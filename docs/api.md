@@ -43,7 +43,13 @@ Add `X-Pocket-Source: shortcut` (or `app`) to have your changes named so in a no
 | `GET /daily?date=YYYY-MM-DD` / `POST /daily {date?}` | today's (or a day's) daily note; POST makes it from the template |
 | `POST /capture {text, date?, note_id?, raw?}` or `text/plain` body | `- 9:12 text` into today's note (format in Settings) |
 | `GET /calendar?month=YYYY-MM` | days with a daily note and how many notes were edited |
-| `GET /templates` | the notes in the templates folder |
+| `GET /templates[?mine=1]` | your templates (notes in the templates folder) with `title_pattern`, `folder`, `everyone`, `next_title`; then others' shared with everyone (`owner`) |
+| `GET /templates/{id}?title=` | a template's text with its placeholders filled in |
+| `POST /templates {name, content? \| from_note_id?, title_pattern?, folder?, everyone?}` | save a template: blank, or a copy of a note ("Save as template") or of a shared template |
+| `PUT /templates/{id} {name?, title_pattern?, folder?, everyone?}` | rename it or change its settings (its text is changed like any note's) |
+| `DELETE /templates/{id}` | to the trash |
+| `POST /templates/{id}/use {title?, folder?, here?}` | a new note from it in one step: title from its pattern, in its folder, else `here`, else the default folder |
+| `POST /templates/preview {pattern, name}` | what a title pattern gives today |
 
 ## The rest
 

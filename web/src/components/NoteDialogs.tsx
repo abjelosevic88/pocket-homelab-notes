@@ -8,7 +8,7 @@ import { Confirm, Loading, Modal, Segmented, useToast } from './ui'
 import { Icon } from './icons'
 import { Select } from './Select'
 
-const SOURCES: Record<string, string> = { web: 'Here', api: 'API', 'nextcloud-api': 'Nextcloud Notes app', sync: 'Changed in the folder', restore: 'Restored', import: 'First seen', capture: 'Quick capture', daily: 'Daily note', app: 'Pocket Homelab app', shortcut: 'Shortcut' }
+const SOURCES: Record<string, string> = { web: 'Here', api: 'API', 'nextcloud-api': 'Nextcloud Notes app', sync: 'Changed in the folder', restore: 'Restored', import: 'First seen', capture: 'Quick capture', daily: 'Daily note', template: 'From a template', app: 'Pocket Homelab app', shortcut: 'Shortcut' }
 
 export function HistoryModal({ note, onClose, onRestored }: { note: Note; onClose: () => void; onRestored: (n: Note) => void }) {
   const [list, setList] = useState<Version[] | null>(null)

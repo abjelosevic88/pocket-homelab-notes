@@ -10,6 +10,7 @@ import { Select } from '../components/Select'
 import NoteView from '../components/NoteView'
 import { newNoteIn } from '../components/Layout'
 import { NoteMenu } from '../components/NoteMenu'
+import { chooseTemplate } from '../components/Templates'
 
 // All notes, a folder, a tag, favourites, recent or a search, with the note on the right.
 export default function Notes() {
@@ -83,6 +84,7 @@ export default function Notes() {
           <div className="row">
             <div className="tool-search grow" title={folder || undefined}><Icon name="search" size={15} /><input value={q} onChange={e => search(e.target.value)} placeholder={folder || tag || shared ? `Search in ${heading}…` : 'Search all notes…'} aria-label="Search notes" />{q && <button type="button" className="btn ghost icon-only xs" onClick={() => search('')} aria-label="Clear the search"><Icon name="x" size={14} /></button>}</div>
             <button type="button" className="btn primary icon-only list-new" onClick={() => newNoteIn(folder ?? settings?.default_folder ?? '', navigate, bump, toast)} title={folder ? `New note in ${heading}` : 'New note'} aria-label="New note here"><Icon name="plus" size={17} strokeWidth={2.2} /></button>
+            <button type="button" className="btn icon-only list-tpl" onClick={chooseTemplate} title="New note from a template (⇧N)" aria-label="New note from a template"><Icon name="template" size={17} /></button>
           </div>
           <div className="row list-opts">
             <span>{notes ? `${notes.length} note${notes.length === 1 ? '' : 's'}` : ''}</span>

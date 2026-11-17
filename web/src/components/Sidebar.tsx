@@ -44,8 +44,9 @@ export function useDashboard() {
   return d
 }
 
-export function Sidebar({ onNew, onNavigate, onFolderMenu, onNewFolder, onSync, syncing }: {
+export function Sidebar({ onNew, onFromTemplate, onNavigate, onFolderMenu, onNewFolder, onSync, syncing }: {
   onNew: () => void
+  onFromTemplate: () => void
   onNavigate: () => void
   onFolderMenu: (path: string, at: Anchor) => void
   onNewFolder: () => void
@@ -84,6 +85,7 @@ export function Sidebar({ onNew, onNavigate, onFolderMenu, onNewFolder, onSync, 
     { to: '/?view=shared', label: 'Shared', icon: 'users', active: onNotes && view === 'shared', count: dash?.shared, title: 'Notes shared with you, and yours you shared' },
     { to: '/tasks', label: 'Tasks', icon: 'check-square', active: loc.pathname === '/tasks', badge: dash?.due_tasks, count: dash?.open_tasks, title: 'Tasks (x)' },
     { to: '/calendar', label: 'Calendar', icon: 'calendar', active: loc.pathname === '/calendar', title: 'Calendar (c)' },
+    { to: '/templates', label: 'Templates', icon: 'template', active: loc.pathname === '/templates', title: 'Your note templates' },
   ]
 
   return (
@@ -93,9 +95,12 @@ export function Sidebar({ onNew, onNavigate, onFolderMenu, onNewFolder, onSync, 
         <span className="sb-title">{title !== 'Pocket Notes' ? title : <>Pocket <b>Notes</b></>}</span>
         {status?.version && <span className="sb-version" title={`Version ${status.version}`}>{/^v?\d+\.\d+/.test(status.version) ? 'v' + status.version.replace(/^v/, '').replace(/[-+].*$/, '') : status.version}</span>}
       </div>
-      <button type="button" className="btn primary create-btn" onClick={() => { onNavigate(); onNew() }} title="New note (n or Alt+N)">
-        <Icon name="plus" size={17} strokeWidth={2.2} />New note<kbd className="kbd-on-primary">N</kbd>
-      </button>
+      <div className="create-row">
+        <button type="button" className="btn primary create-btn" onClick={() => { onNavigate(); onNew() }} title="New note (n or Alt+N)">
+          <Icon name="plus" size={17} strokeWidth={2.2} />New note<kbd className="kbd-on-primary">N</kbd>
+        </button>
+        <button type="button" className="btn create-tpl icon-only" onClick={() => { onNavigate(); onFromTemplate() }} title="New note from a template (⇧N)" aria-label="New note from a template"><Icon name="template" size={18} /></button>
+      </div>
       <form className="sb-capture" onSubmit={doCapture}>
         <Icon name="zap" size={14} />
         <input value={capture} onChange={e => setCapture(e.target.value)} placeholder="Capture to today…" aria-label="Quick capture to today's note" enterKeyHint="send" />

@@ -11,7 +11,7 @@ import { useDebounce } from './ui'
 
 type Row = { key: string; group: string; icon: React.ReactNode; label: React.ReactNode; sub?: React.ReactNode; hint?: string; run: () => void }
 
-export function CommandPalette({ onClose, onNew, onShortcuts }: { onClose: () => void; onNew: () => void; onShortcuts: () => void }) {
+export function CommandPalette({ onClose, onNew, onFromTemplate, onShortcuts }: { onClose: () => void; onNew: () => void; onFromTemplate: () => void; onShortcuts: () => void }) {
   const { folders, tags, themeMode, setThemeMode } = useApp()
   const navigate = useNavigate()
   const [q, setQ] = useState('')
@@ -47,6 +47,8 @@ export function CommandPalette({ onClose, onNew, onShortcuts }: { onClose: () =>
     const commands: (Omit<Row, 'group' | 'icon'> & { icon: string; keywords?: string })[] = [
       { key: 'search', icon: 'search', label: n ? `Search everything for “${q.trim()}”` : 'Search everything', run: () => navigate(`/?q=${encodeURIComponent(q.trim())}`) },
       { key: 'new', icon: 'plus', label: 'New note', hint: 'N', keywords: 'create make write', run: onNew },
+      { key: 'new-tpl', icon: 'template', label: 'New note from a template', hint: '⇧N', keywords: 'create make template meeting ticket', run: onFromTemplate },
+      { key: 'templates', icon: 'template', label: 'Templates', keywords: 'manage edit template', run: () => navigate('/templates') },
       { key: 'today', icon: 'today', label: 'Today', hint: 'T', keywords: 'daily journal capture', run: () => navigate('/today') },
       { key: 'all', icon: 'notes', label: 'All notes', hint: 'A', run: () => navigate('/') },
       { key: 'recent', icon: 'clock', label: 'Recent', run: () => navigate('/?view=recent') },

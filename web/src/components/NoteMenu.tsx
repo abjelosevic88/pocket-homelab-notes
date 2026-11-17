@@ -7,6 +7,7 @@ import { copyText } from '../lib/clipboard'
 import { Confirm, Field, Menu, type MenuItem, Modal, useToast } from './ui'
 import { MoveModal, PeopleModal, ShareModal } from './NoteDialogs'
 import { noteURL } from './NoteView'
+import { TemplateForm, TemplateSettings, isTemplateNote } from './Templates'
 
 /** A change asked of a note from outside its editor (the list's right-click menu). */
 export type NoteAction = { kind: 'patch'; body: Record<string, unknown>; msg?: string } | { kind: 'rename'; title: string } | { kind: 'delete' }
@@ -31,7 +32,7 @@ export function NoteMenu({ note, x, y, onClose }: { note: Note; x: number; y: nu
   const { bump, settings } = useApp()
   const { toast } = useToast()
   const navigate = useNavigate()
-  const [sheet, setSheetRaw] = useState<'' | 'rename' | 'move' | 'share' | 'people' | 'delete'>('')
+  const [sheet, setSheetRaw] = useState<'' | 'rename' | 'move' | 'share' | 'people' | 'delete' | 'save-template' | 'template-settings'>('')
   const sheetRef = useRef<typeof sheet>('')
   const setSheet = (k: typeof sheet) => { sheetRef.current = k; setSheetRaw(k) }
   const [title, setTitle] = useState(note.title)
@@ -64,6 +65,7 @@ export function NoteMenu({ note, x, y, onClose }: { note: Note; x: number; y: nu
     'sep',
     { label: 'Who has it…', icon: 'users', onSelect: () => setSheet('people') },
     { label: 'Copy to my notes', icon: 'copy', onSelect: copyMine },
+    { label: 'Save as template…', icon: 'template', onSelect: () => setSheet('save-template') },
     { label: 'Download .md', icon: 'download', onSelect: () => { onClose(); location.href = `${V1}/notes/${note.id}/download` } },
   ] : [
     { label: 'Open', icon: 'note', onSelect: () => open(`/note/${note.id}`) },
@@ -77,6 +79,9 @@ export function NoteMenu({ note, x, y, onClose }: { note: Note; x: number; y: nu
       onClose()
       try { const n = await api.post<Note>(`${V1}/notes/${note.id}/duplicate`); bump(); navigate(`/note/${n.id}${location.search}`) } catch (e) { toast((e as Error).message, 'err') }
     } },
+    isTemplateNote(note, settings?.templates_folder)
+      ? { label: 'Template settings…', icon: 'template', onSelect: () => setSheet('template-settings') }
+      : { label: 'Save as template…', icon: 'template', onSelect: () => setSheet('save-template') },
     { label: note.shared ? `Shared with ${note.shared} ${note.shared === 1 ? 'person' : 'people'}…` : 'Share with people…', icon: 'users', onSelect: () => setSheet('people') },
     { label: 'Share a link…', icon: 'share', onSelect: () => setSheet('share') },
     'sep',
@@ -98,6 +103,8 @@ export function NoteMenu({ note, x, y, onClose }: { note: Note; x: number; y: nu
       </Modal>}
       {sheet === 'move' && <MoveModal current={note.category} onClose={onClose} onMove={cat => run({ kind: 'patch', body: { category: cat }, msg: `Moved to ${cat || 'Notes'}` }, `Moved to ${cat || 'Notes'}`)} />}
       {sheet === 'share' && <ShareModal note={note} onClose={onClose} />}
+      {sheet === 'save-template' && <TemplateForm fromNote={note} onClose={onClose} />}
+      {sheet === 'template-settings' && <TemplateSettings id={note.id} onClose={onClose} />}
       {sheet === 'people' && <PeopleModal note={note} onClose={() => { onClose(); bump() }} />}
       {sheet === 'delete' && <Confirm title={`Delete “${note.title}”?`} message={<>It goes to the trash (Trash in the sidebar) for {settings?.trash_days ?? 30} days{settings?.storage_kind === 'nextcloud' ? ', and to Nextcloud’s own trash bin' : ''}.</>} onCancel={onClose} onConfirm={() => run({ kind: 'delete' }, 'Moved to the trash')} />}
     </>

@@ -12,6 +12,7 @@ import { ShortcutsSheet } from './ShortcutsSheet'
 import { ErrorBoundary } from './ErrorBoundary'
 import { type Anchor, Avatar, Confirm, Menu, type MenuItem, MenuButton, Modal, modalOpen, useIsMobile, useMediaQuery, useToast } from './ui'
 import { AskButton } from './AskButton'
+import { TemplateChooser } from './Templates'
 
 const SIDEBAR_KEY = 'pn-sidebar'
 
@@ -40,6 +41,7 @@ export default function Layout() {
 
   const [palette, setPalette] = useState(false)
   const [shortcuts, setShortcuts] = useState(false)
+  const [chooser, setChooser] = useState(false)
   const [folderMenu, setFolderMenu] = useState<{ path: string; at: Anchor } | null>(null)
   const [prompt, setPrompt] = useState<{ kind: 'new' | 'rename'; path: string } | null>(null)
   const [del, setDel] = useState<string | null>(null)
@@ -62,8 +64,10 @@ export default function Layout() {
 
   useEffect(() => {
     const open = () => setShortcuts(true)
+    const tpl = () => setChooser(true)
     window.addEventListener('pn:shortcuts', open)
-    return () => window.removeEventListener('pn:shortcuts', open)
+    window.addEventListener('pn:from-template', tpl)
+    return () => { window.removeEventListener('pn:shortcuts', open); window.removeEventListener('pn:from-template', tpl) }
   }, [])
 
   // ⌘K finds a note, ⌘⇧N / Alt+N makes one, ⌘⇧D opens today; single keys when nothing is typed.
@@ -82,6 +86,7 @@ export default function Layout() {
         case '/': e.preventDefault(); setPalette(true); break
         case '?': e.preventDefault(); setShortcuts(true); break
         case 'n': e.preventDefault(); newNote(); break
+        case 'N': e.preventDefault(); setChooser(true); break
         case 't': go('/today'); break
         case 'a': go('/'); break
         case 'x': go('/tasks'); break
@@ -97,6 +102,7 @@ export default function Layout() {
   const folderItems = (path: string): MenuItem[] => [
     { heading: leaf(path) },
     { label: 'New note here', icon: 'file-plus', onSelect: () => newNoteIn(path, navigate, bump, toast) },
+    { label: 'New note here from a template…', icon: 'template', onSelect: () => { navigate(`/?in=${encodeURIComponent(path)}`); setChooser(true) } },
     { label: 'New folder inside…', icon: 'folder-plus', onSelect: () => setPrompt({ kind: 'new', path }) },
     { label: 'Rename…', icon: 'edit', onSelect: () => setPrompt({ kind: 'rename', path }) },
     'sep',
@@ -108,14 +114,15 @@ export default function Layout() {
     <div className={`app ${sidebarOpen ? 'with-sidebar' : 'no-sidebar'} ${mobile ? 'is-mobile' : ''} ${drawer ? 'drawer-mode' : ''} ${onNote ? 'on-note' : ''}`}>
       {drawer && sidebarOpen && <div className="drawer-backdrop" onClick={e => { if (e.timeStamp - drawerOpenedAt.current > 400) setSidebarOpen(false) }} />}
       <div className={`sidebar-wrap ${sidebarOpen ? 'open' : ''}`}>
-        <Sidebar onNew={newNote} onNavigate={closeDrawer} onFolderMenu={(path, at) => setFolderMenu({ path, at })} onNewFolder={() => { closeDrawer(); setPrompt({ kind: 'new', path: '' }) }} onSync={syncNow} syncing={syncing} />
+        <Sidebar onNew={newNote} onFromTemplate={() => setChooser(true)} onNavigate={closeDrawer} onFolderMenu={(path, at) => setFolderMenu({ path, at })} onNewFolder={() => { closeDrawer(); setPrompt({ kind: 'new', path: '' }) }} onSync={syncNow} syncing={syncing} />
       </div>
       <div className="main">
         <TopBar onMenu={toggleSidebar} onPalette={() => setPalette(true)} mobile={mobile} compact={narrow} sidebarOpen={sidebarOpen} />
         <main className="content"><ErrorBoundary key={section(loc.pathname)} where={loc.pathname}><Outlet /></ErrorBoundary></main>
       </div>
       {mobile && <button type="button" className="fab" aria-label="New note" title="New note" onClick={newNote}><Icon name="plus" size={26} strokeWidth={2.2} /></button>}
-      {palette && <CommandPalette onClose={() => setPalette(false)} onNew={newNote} onShortcuts={() => setShortcuts(true)} />}
+      {palette && <CommandPalette onClose={() => setPalette(false)} onNew={newNote} onFromTemplate={() => setChooser(true)} onShortcuts={() => setShortcuts(true)} />}
+      {chooser && <TemplateChooser here={here} onClose={() => setChooser(false)} />}
       {shortcuts && <ShortcutsSheet onClose={() => setShortcuts(false)} />}
       {folderMenu && <Menu anchor={folderMenu.at} items={folderItems(folderMenu.path)} onClose={() => setFolderMenu(null)} width={210} />}
       {prompt && <FolderPrompt kind={prompt.kind} path={prompt.path} onClose={() => setPrompt(null)} onDone={name => { const p = prompt; setPrompt(null); folderAction(p.kind, p.path, name) }} />}
@@ -124,7 +131,7 @@ export default function Layout() {
   )
 }
 
-const SECTION: Record<string, string> = { today: 'Today', tasks: 'Tasks', calendar: 'Calendar', trash: 'Trash', new: 'New note' }
+const SECTION: Record<string, string> = { today: 'Today', tasks: 'Tasks', calendar: 'Calendar', trash: 'Trash', new: 'New note', templates: 'Templates' }
 
 function TopBar({ onMenu, onPalette, mobile, compact, sidebarOpen }: { onMenu: () => void; onPalette: () => void; mobile: boolean; compact: boolean; sidebarOpen: boolean }) {
   const { user, themeMode, setThemeMode, status, setUser } = useApp()
