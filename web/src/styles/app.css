@@ -139,8 +139,9 @@
 .tree-link .grow { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .tree-link .sb-count { padding-right: 4px; }
 .tree-row .cal-more { margin-right: 2px; }
-.tree-row:hover .sb-count, .tree-row:focus-within .sb-count { display: none; }
-@media (hover: none) { .tree-row .sb-count { display: none; } }
+.tree-row:hover .cal-more, .tree-row:focus-within .cal-more { opacity: 1; }
+/* The count stays put on hover and when chosen (the ⋯ button has its own place beside it), a shade darker to read on the row's background. */
+.tree-row:hover .sb-count, .tree-row.active .sb-count, .sb-nav-item:hover .sb-count, .sb-nav-item.active .sb-count { color: var(--muted); }
 
 .tag-cloud { display: flex; flex-wrap: wrap; gap: 4px; padding: 2px 2px 0; }
 .tag-cloud .tag { display: inline-flex; align-items: center; gap: 4px; font-size: 12px; font-weight: 550; height: 24px; padding: 0 9px; border-radius: 999px; background: var(--surface); border: 1px solid var(--border); color: var(--text-2); text-decoration: none !important; }
