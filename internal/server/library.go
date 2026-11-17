@@ -839,8 +839,10 @@ func (s *Server) updateNote(ctx context.Context, uid, id int64, in NoteInput, if
 		return nil, errors.New("this note is read-only")
 	}
 	// The title follows the first line, as in Nextcloud Notes, when the
-	// person wants that and this save did not name a title itself.
-	if contentChanged && in.Title == nil && st.TitleFromFirstLine && (source == "web") {
+	// person wants that and this save did not name a title itself. Not a
+	// template's: its first line is what new notes start with ("# {{title}}"),
+	// its name is its own.
+	if contentChanged && in.Title == nil && st.TitleFromFirstLine && (source == "web") && !inFolder(n.Category, templatesFolder(st)) {
 		if t := notesmd.TitleFromContent(*in.Content); t != "" && notesmd.SafeName(t) != n.Title {
 			in.Title = &t
 		}

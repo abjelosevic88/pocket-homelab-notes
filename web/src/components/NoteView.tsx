@@ -508,9 +508,9 @@ const NoteView = forwardRef<NoteViewHandle, { id: number; onBack?: () => void; e
         <div className="editor-pane">
           {mode === 'rich'
             ? <RichEditor ref={rich} docKey={String(note.id)} revision={revision} content={draft} noteID={note.id} readonly={locked} reader={reading} checkable tools={offered} draw={addresses.draw} theme={theme}
-                spellcheck={settings?.spellcheck} placeholder="Write, or type / for blocks and homelab tools" onChange={changed} onMessage={onMessage} onRequest={onRequest}
+                spellcheck={settings?.spellcheck} placeholder="Write, or type / for blocks and homelab tools" template={isTemplateNote(note, settings?.templates_folder)} onChange={changed} onMessage={onMessage} onRequest={onRequest}
                 onFailed={msg => { toast(`The rich editor could not open this note (${msg}); showing Markdown.`, 'err'); setMode('markdown') }} />
-            : <MarkdownEditor ref={md} docKey={String(note.id)} revision={revision} content={draft} readonly={locked} spellcheck={settings?.spellcheck} onChange={changed} onPasteFiles={uploadFiles} onOpenLink={u => openLink(u)} onPeople={findPeople} />}
+            : <MarkdownEditor ref={md} docKey={String(note.id)} revision={revision} content={draft} readonly={locked} spellcheck={settings?.spellcheck} onChange={changed} onPasteFiles={uploadFiles} onOpenLink={u => openLink(u)} onPeople={findPeople} template={isTemplateNote(note, settings?.templates_folder)} />}
         </div>
         {panel && <div className="panel-scrim" onClick={() => setPanel('')} />}
         {panel && <aside className="note-panel">

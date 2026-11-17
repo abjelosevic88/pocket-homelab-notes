@@ -54,6 +54,8 @@ interface Props {
   theme: 'light' | 'dark'
   spellcheck?: boolean
   placeholder?: string
+  /** A template is open: `{{` lists the placeholders. */
+  template?: boolean
   onChange?: (markdown: string) => void
   onMessage?: (m: EditorMessage) => void
   onRequest?: (m: EditorMessage) => Promise<unknown>
@@ -113,7 +115,7 @@ export const RichEditor = forwardRef<RichEditorHandle, Props>(function RichEdito
     ed.load(p.content, {
       document: p.docKey, noteID: p.noteID ?? null, share: p.share ?? null, desktop: window.innerWidth > 760, compact: false,
       tools: p.tools ?? [], draw: p.draw ?? null, readonly: !!p.readonly, reader: !!p.reader, checkable: !!p.checkable, focus: !!p.focus, accent, theme: p.theme,
-      spellcheck: p.spellcheck !== false, placeholder: p.placeholder,
+      spellcheck: p.spellcheck !== false, placeholder: p.placeholder, template: !!p.template,
     }).then(() => {
       // A real keyboard: the editor's toolbar follows its focus.
       ed.setKeyboard(false, true)

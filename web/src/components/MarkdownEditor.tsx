@@ -7,6 +7,7 @@ import { syntaxHighlighting, syntaxTree, HighlightStyle, indentOnInput, bracketM
 import { searchKeymap, highlightSelectionMatches } from '@codemirror/search'
 import { autocompletion, closeBrackets, type Completion, type CompletionContext, type CompletionResult } from '@codemirror/autocomplete'
 import type { Person } from '../lib/types'
+import { matchPlaceholders, placeholderOpened } from '../lib/placeholders'
 import { tags as t } from '@lezer/highlight'
 
 // The note as Markdown, every character of it: the plain editor for people who want to see and
@@ -33,6 +34,8 @@ interface Props {
   onOpenLink?: (url: string) => void
   /** People from Pocket Contacts for `@` and a name ([] when it is off). */
   onPeople?: (q: string) => Promise<Person[]>
+  /** A template is open: `{{` lists the placeholders. */
+  template?: boolean
 }
 
 // `@` and a name at the start of a line or after a space (an address like name@host is left
@@ -131,9 +134,32 @@ export const MarkdownEditor = forwardRef<MarkdownEditorHandle, Props>(function M
     }
   }
 
+  // `{{da` in a template lists the placeholders; taking one writes it whole, over the `}}` the
+  // closing brackets may have put after the cursor.
+  function fields(cx: CompletionContext): CompletionResult | null {
+    if (!latest.current.template) return null
+    const line = cx.state.doc.lineAt(cx.pos)
+    const m = placeholderOpened.exec(line.text.slice(0, cx.pos - line.from))
+    if (!m) return null
+    const from = cx.pos - m[0].length
+    const list = matchPlaceholders(m[1])
+    if (!list.length) return null
+    return {
+      from, filter: false,
+      options: list.map(p => ({
+        label: p.text, detail: p.detail, type: 'variable',
+        apply: (view: EditorView, _c: Completion, at: number, to: number) => {
+          const rest = view.state.doc.sliceString(to, to + 2)
+          const end = to + (rest.startsWith('}}') ? 2 : rest.startsWith('}') ? 1 : 0)
+          view.dispatch({ changes: { from: at, to: end, insert: p.text }, selection: EditorSelection.cursor(at + p.text.length), scrollIntoView: true })
+        },
+      })),
+    }
+  }
+
   useEffect(() => {
     exts.current = [
-          autocompletion({ override: [people], icons: false, addToOptions: [{ render: personIcon, position: 20 }] }),
+          autocompletion({ override: [fields, people], icons: false, addToOptions: [{ render: personIcon, position: 20 }] }),
           history(), drawSelection(), dropCursor(), highlightActiveLine(), indentOnInput(), bracketMatching(), closeBrackets(), highlightSelectionMatches(),
           markdown({ base: markdownLanguage }), syntaxHighlighting(style), EditorView.lineWrapping, theme,
           cmPlaceholder('Write in Markdown…'),

@@ -11,6 +11,11 @@ import { linkSchema } from '@milkdown/kit/preset/commonmark'
 import { clearSlash, insertText, request } from './shared.js'
 import { stamps } from './inserts.js'
 import { enabled } from './homelab.js'
+import { matchPlaceholders, placeholderOpened } from '../lib/placeholders.ts'
+
+// A template is open: `{{` lists the placeholders. Other notes keep `{{` as plain text.
+let templateMode = false
+export const setTemplateMode = (on) => { templateMode = !!on }
 
 const SHOWN = 8
 
@@ -70,6 +75,19 @@ const dates = [
 
 // What opens a list: the text before the cursor it answers to, what it offers, and what taking one does.
 const kinds = (ctx) => [
+  {
+    // `{{da` in a template: the placeholders filled in when a note is made from it. Taking one
+    // writes it whole, over a `}}` already after the cursor.
+    opened: placeholderOpened, lead: 0, label: 'Placeholders', none: () => null, only: () => templateMode,
+    load: () => Promise.resolve([]),
+    offer: (_all, query) => matchPlaceholders(query).map((p) => ({ title: p.text, detail: p.detail })),
+    take: (view, range, item) => {
+      const $to = view.state.doc.resolve(range.to)
+      const rest = $to.parent.textBetween($to.parentOffset, Math.min($to.parent.content.size, $to.parentOffset + 2))
+      const end = range.to + (rest.startsWith('}}') ? 2 : rest.startsWith('}') ? 1 : 0)
+      view.dispatch(view.state.tr.insertText(item.title, range.from, end).scrollIntoView()); view.focus()
+    },
+  },
   {
     // `[[name`
     opened: /\[\[([^\[\]\n]{0,80})$/, lead: 0, label: 'Notes', wait: 'Looking…', none: (all) => all.length ? 'No note by that name' : 'No other notes yet',
@@ -185,7 +203,7 @@ export const suggestions = $prose((ctx) => {
           const inText = selection.empty && view.editable && $from.parent.isTextblock && !$from.parent.type.spec.code
           const before = inText ? $from.parent.textBetween(0, $from.parentOffset, undefined, '￼') : ''
           let found = null, match = null
-          for (const each of all) { match = before.match(each.opened); if (match) { found = each; break } }
+          for (const each of all) { if (each.only && !each.only()) { continue } match = before.match(each.opened); if (match) { found = each; break } }
           if (!found) { dismissedAt = null; if (range) { close() } return }
           const typed = match[match.length - 1], from = $from.pos - match[0].length + (found.lead ? match[1].length : 0)
           // Escape was pressed for this one: it stays text until another is typed.

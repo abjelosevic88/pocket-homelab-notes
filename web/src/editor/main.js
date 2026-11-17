@@ -26,7 +26,7 @@ import { post, svg, insertBlocks, notice } from './shared.js'
 import { detailsPlugins } from './details.js'
 import { mathPlugins, mathPreview, MATH, loadKatex } from './math.js'
 import { insertPlugins, findFootnote } from './inserts.js'
-import { suggestions } from './suggest.js'
+import { suggestions, setTemplateMode } from './suggest.js'
 import { emojiRule, loadEmoji, closeEmojiPicker } from './emoji.js'
 import { insertTemplate } from './templates.js'
 import { findHeading, jumpTo } from './toc.js'
@@ -138,6 +138,7 @@ async function load(markdown, options) {
   if (options.accent) { document.documentElement.style.setProperty('--accent', options.accent) }
   if (options.theme) { document.documentElement.dataset.theme = options.theme }
   attachments.share = options.share || null
+  setTemplateMode(options.template)
   attachments.draw = options.draw || null
   document.body.spellcheck = options.spellcheck !== false
   document.body.classList.toggle('compact', !!options.compact)

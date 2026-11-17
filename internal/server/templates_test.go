@@ -151,6 +151,21 @@ func TestTemplates(t *testing.T) {
 		t.Errorf("from the heading: %q", n.Title)
 	}
 
+	// "Title follows the first line" leaves a template's name alone.
+	st, _ := h.st.GetSettings(t.Context(), 1)
+	st.TitleFromFirstLine = true
+	h.st.SaveSettings(t.Context(), 1, st)
+	var saved store.Note
+	h.do(aTok, "PUT", "/api/v1/notes/"+itoa(old.ID), map[string]any{"content": "# {{title}}\n\nnew"}, &saved, "X-Pocket-Source", "web")
+	if saved.Title != "Standup" {
+		t.Errorf("a template renamed after its first line: %q", saved.Title)
+	}
+	var plain store.Note
+	h.do(aTok, "PUT", "/api/v1/notes/"+itoa(src.ID), map[string]any{"content": "# Renamed\n"}, &plain, "X-Pocket-Source", "web")
+	if plain.Title != "Renamed" {
+		t.Errorf("a plain note keeps following its first line: %q", plain.Title)
+	}
+
 	var p map[string]string
 	h.do(aTok, "POST", "/api/v1/templates/preview", map[string]any{"pattern": "{{date:YYMMDD}} {{name}}", "name": "Call"}, &p)
 	if p["title"] != time.Now().Format("060102")+" Call" {
