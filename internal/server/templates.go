@@ -25,6 +25,26 @@ type templateOut struct {
 	Everyone     bool              `json:"everyone"`      // everyone on this server may use it
 	Owner        *store.SharedFrom `json:"owner,omitempty"`
 	NextTitle    string            `json:"next_title"` // what a note made from it now is called
+	Preview      []string          `json:"preview"`    // its first lines, as written
+}
+
+// previewLines are a template's first few non-empty lines, for its card.
+func previewLines(content string) []string {
+	out := []string{}
+	for _, l := range strings.Split(content, "\n") {
+		l = strings.TrimRight(l, " \t\r")
+		if strings.TrimSpace(l) == "" {
+			continue
+		}
+		if r := []rune(l); len(r) > 90 {
+			l = string(r[:90]) + "…"
+		}
+		out = append(out, l)
+		if len(out) == 7 {
+			break
+		}
+	}
+	return out
 }
 
 func templatesFolder(st store.Settings) string { return notesmd.SafeFolder(st.TemplatesFolder) }
@@ -62,8 +82,9 @@ func (s *Server) dressTemplate(n *store.Note, meta store.TemplateMeta, owner *st
 	if strings.TrimSpace(meta.TitlePattern) == "" {
 		meta.TitlePattern = defaultPattern(n.Content)
 	}
+	preview := previewLines(n.Content)
 	n.Content = ""
-	return templateOut{Note: *n, Name: n.Title, TitlePattern: meta.TitlePattern, Folder: meta.Folder, Everyone: meta.Shared, Owner: owner, NextTitle: newTitle(meta, n.Title, time.Now(), st)}
+	return templateOut{Preview: preview, Note: *n, Name: n.Title, TitlePattern: meta.TitlePattern, Folder: meta.Folder, Everyone: meta.Shared, Owner: owner, NextTitle: newTitle(meta, n.Title, time.Now(), st)}
 }
 
 // templateFor finds template id for person uid: one of theirs (a note in

@@ -44,6 +44,8 @@ export interface Template extends Note {
   owner?: { owner_id: number; name: string; email: string }
   /** The title a note made from it now gets. */
   next_title: string
+  /** Its first lines, as written: the glimpse on its card. */
+  preview: string[]
 }
 
 export interface SearchHit extends Note { snippet: string; rank: number }
