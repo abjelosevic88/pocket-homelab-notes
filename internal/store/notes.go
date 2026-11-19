@@ -168,6 +168,17 @@ func (s *Store) FindNoteByTitle(ctx context.Context, userID int64, title, folder
 	return n, nil
 }
 
+// HasNoteCopy reports whether the person already has a note in folder named
+// title (or "title (N)", the name an import gives when the title is taken)
+// with exactly this content hash: an import that finds one skips the note.
+func (s *Store) HasNoteCopy(ctx context.Context, userID int64, folder, title, hash string) bool {
+	var n int
+	_ = s.DB.QueryRowContext(ctx, `SELECT COUNT(1) FROM notes WHERE user_id = ? AND lower(category) = lower(?) AND hash = ?
+		AND (lower(title) = lower(?) OR lower(title) LIKE lower(?) ESCAPE '\')`,
+		userID, folder, hash, title, likeEscape(title)+" (%)").Scan(&n)
+	return n > 0
+}
+
 // PathTaken reports whether a person has a note at path.
 func (s *Store) PathTaken(ctx context.Context, userID int64, path string) bool {
 	var n int

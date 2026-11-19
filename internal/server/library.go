@@ -726,6 +726,8 @@ type NoteInput struct {
 	Favorite *bool   `json:"favorite"`
 	Pinned   *bool   `json:"pinned"`
 	Modified *int64  `json:"modified"`
+	// Created backdates a new note (imports); zero = now.
+	Created time.Time `json:"-"`
 }
 
 // uniquePath finds a free file name for title in category: "Title.md",
@@ -794,6 +796,9 @@ func (s *Server) createNote(ctx context.Context, uid int64, in NoteInput, source
 	n := &store.Note{UserID: uid, Path: p, RemoteETag: ent.ETag, FileID: ent.FileID, Modified: modifiedOf(ent)}
 	if in.Modified != nil && *in.Modified > 0 {
 		n.Modified = *in.Modified
+	}
+	if !in.Created.IsZero() {
+		n.CreatedAt = in.Created.UTC().Format(time.RFC3339Nano)
 	}
 	tags, links := fill(n, content)
 	if in.Favorite != nil {

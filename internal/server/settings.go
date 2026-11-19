@@ -509,15 +509,29 @@ func (s *Server) handleExportZip(w http.ResponseWriter, r *http.Request) {
 	_ = zw.Close()
 }
 
+// Import limits: the upload, one file inside a zip, and everything a zip
+// unpacks to (so a small zip cannot unpack into an endless one).
+const (
+	importMaxBytes   = 512 << 20
+	importMaxFile    = 200 << 20
+	importMaxUnpack  = 4 << 30
+	importMaxEntries = 100000
+)
+
 // handleImport takes Markdown or text files, or a zip of a notes folder
-// (folders and pictures kept), into the person's notes.
+// (folders and pictures kept), into the person's notes: Notes' own export.zip
+// and the Markdown zips Pocket Move makes from Evernote, Keep, Notion and Apple
+// Notes. Front matter title/created/updated name and date the note. It only
+// adds: a note already there with the same name and text is skipped, and so is
+// a file already there, so the same zip twice changes nothing.
 func (s *Server) handleImport(w http.ResponseWriter, r *http.Request) {
 	ctx, uid := r.Context(), me(r)
-	r.Body = http.MaxBytesReader(w, r.Body, 512<<20)
+	r.Body = http.MaxBytesReader(w, r.Body, importMaxBytes)
 	if err := r.ParseMultipartForm(64 << 20); err != nil {
 		writeErr(w, http.StatusBadRequest, "send the files as multipart form data (field \"file\")")
 		return
 	}
+	defer r.MultipartForm.RemoveAll()
 	base := notesmd.SafeFolder(r.FormValue("category"))
 	l, err := s.lib(ctx, uid)
 	if err != nil {
@@ -526,7 +540,7 @@ func (s *Server) handleImport(w http.ResponseWriter, r *http.Request) {
 	}
 	notes, files, skipped := 0, 0, 0
 	var problems []string
-	put := func(rel string, data []byte) {
+	put := func(rel string, data []byte, modified time.Time) {
 		rel = strings.TrimLeft(strings.ReplaceAll(rel, "\\", "/"), "/")
 		parts := strings.Split(rel, "/")
 		for i := range parts {
@@ -543,7 +557,24 @@ func (s *Server) handleImport(w http.ResponseWriter, r *http.Request) {
 		if isNoteFile(clean) {
 			cat, title := splitPath(clean)
 			content := string(bytes.TrimPrefix(data, []byte("\xef\xbb\xbf")))
-			if _, err := s.createNote(ctx, uid, NoteInput{Title: &title, Category: &cat, Content: &content}, "import"); err != nil {
+			meta, content := notesmd.TakeFrontMatter(content)
+			if strings.TrimSpace(meta.Title) != "" {
+				title = meta.Title
+			}
+			cat, title = notesmd.SafeFolder(cat), notesmd.SafeName(strings.TrimSpace(title))
+			if s.store.HasNoteCopy(ctx, uid, cat, title, hashOf(content)) {
+				skipped++
+				return
+			}
+			in := NoteInput{Title: &title, Category: &cat, Content: &content, Created: meta.Created}
+			if !meta.Updated.IsZero() {
+				modified = meta.Updated
+			}
+			if !modified.IsZero() && modified.Year() > 1980 {
+				m := modified.Unix()
+				in.Modified = &m
+			}
+			if _, err := s.createNote(ctx, uid, in, "import"); err != nil {
 				problems = append(problems, clean+": "+err.Error())
 				return
 			}
@@ -563,6 +594,7 @@ func (s *Server) handleImport(w http.ResponseWriter, r *http.Request) {
 		}
 		files++
 	}
+	var unpacked int64
 	for _, fh := range r.MultipartForm.File["file"] {
 		f, err := fh.Open()
 		if err != nil {
@@ -573,29 +605,49 @@ func (s *Server) handleImport(w http.ResponseWriter, r *http.Request) {
 		if err != nil {
 			continue
 		}
-		if strings.EqualFold(path.Ext(fh.Filename), ".zip") {
-			zr, err := zip.NewReader(bytes.NewReader(data), int64(len(data)))
-			if err != nil {
-				problems = append(problems, fh.Filename+": not a readable zip")
-				continue
-			}
-			for _, zf := range zr.File {
-				if zf.FileInfo().IsDir() || strings.HasPrefix(zf.Name, "__MACOSX/") || path.Base(zf.Name) == ".DS_Store" {
-					continue
-				}
-				rc, err := zf.Open()
-				if err != nil {
-					continue
-				}
-				b, err := io.ReadAll(io.LimitReader(rc, 200<<20))
-				rc.Close()
-				if err == nil {
-					put(zf.Name, b)
-				}
-			}
+		// A zip, or a file without a name's ending that is one (an upload as "blob").
+		isZip := strings.EqualFold(path.Ext(fh.Filename), ".zip") || path.Ext(fh.Filename) == "" && bytes.HasPrefix(data, []byte("PK\x03\x04"))
+		if !isZip {
+			put(fh.Filename, data, time.Time{})
 			continue
 		}
-		put(fh.Filename, data)
+		zr, err := zip.NewReader(bytes.NewReader(data), int64(len(data)))
+		if err != nil {
+			problems = append(problems, fh.Filename+": not a readable zip")
+			continue
+		}
+		if len(zr.File) > importMaxEntries {
+			problems = append(problems, fh.Filename+": too many files in one zip")
+			continue
+		}
+		for _, zf := range zr.File {
+			if zf.FileInfo().IsDir() || strings.HasPrefix(zf.Name, "__MACOSX/") || path.Base(zf.Name) == ".DS_Store" {
+				continue
+			}
+			if zf.UncompressedSize64 > importMaxFile {
+				problems = append(problems, zf.Name+": too big, skipped")
+				continue
+			}
+			rc, err := zf.Open()
+			if err != nil {
+				continue
+			}
+			b, err := io.ReadAll(io.LimitReader(rc, importMaxFile+1))
+			rc.Close()
+			if err != nil {
+				problems = append(problems, zf.Name+": "+err.Error())
+				continue
+			}
+			if len(b) > importMaxFile {
+				problems = append(problems, zf.Name+": too big, skipped")
+				continue
+			}
+			if unpacked += int64(len(b)); unpacked > importMaxUnpack {
+				problems = append(problems, fh.Filename+": unpacks to more than 4 GB, stopped there")
+				break
+			}
+			put(zf.Name, b, zf.Modified)
+		}
 	}
-	writeJSON(w, http.StatusOK, map[string]any{"notes": notes, "files": files, "skipped": skipped, "problems": problems})
+	writeJSON(w, http.StatusOK, map[string]any{"imported": notes + files, "notes": notes, "files": files, "skipped": skipped, "problems": problems})
 }

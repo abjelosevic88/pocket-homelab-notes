@@ -108,6 +108,7 @@ Notes apps and the Pocket Homelab app work against it too.
   it stays your file in your storage, and their saves land in its history with their name.
 - **Share** a note as a read-only public link, with an end date if you like. Print / PDF, standalone
   HTML, `.md`, or the whole folder as a zip. Import Markdown files or a zip (Obsidian, Bear, Joplin).
+- Pocket Move can copy your notes out and bring notes in.
 
 **The rest**
 - **Nextcloud Notes API** (v0.2 and v1, attachments, unified search, the WebDAV the apps use): the

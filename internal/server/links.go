@@ -20,6 +20,18 @@ var linkOffers = []core.Offer{
 	{Scope: "notes:write", Name: "Write in your notes", Description: "Create notes, add lines to them and to today's daily note, tick tasks."},
 }
 
+// portable is what Pocket Move may copy out and bring in (docs/move.md in
+// pocket-homelab-core), for the person the link acts for.
+var portable = &core.Portable{
+	Exports: []core.PortableExport{
+		{Path: "/api/v1/export.zip", File: "notes.zip", Kind: core.KindPocket, Title: "Every note as a Markdown file, with its folders and pictures"},
+	},
+	Imports: []core.PortableImport{
+		{Path: "/api/v1/import", Kind: core.KindPocket, Form: "file", MaxBytes: importMaxBytes, Title: "Adds the notes from another box; notes already here are left alone"},
+		{Path: "/api/v1/import", Kind: core.KindMarkdownZip, Form: "file", MaxBytes: importMaxBytes, Title: "Adds Markdown files as notes, folders kept; notes already here are left alone"},
+	},
+}
+
 // linkUses are the Pocket apps whose data the editor's homelab tools put into
 // a note, and Pocket Files, which can hold the notes folder itself.
 var linkUses = []core.Use{
@@ -55,6 +67,9 @@ var linkRoutes = []linkRoute{
 var errLinkScope = errors.New("outside the link's scope")
 
 func linkAllows(scopes []string, r *http.Request) bool {
+	if portable.LinkAllows(scopes, r) {
+		return true
+	}
 	for _, lr := range linkRoutes {
 		if !strings.Contains(" "+lr.methods+" ", " "+r.Method+" ") || !lr.path.MatchString(r.URL.Path) {
 			continue

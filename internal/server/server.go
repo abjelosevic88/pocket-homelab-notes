@@ -276,6 +276,7 @@ func (s *Server) Router() http.Handler {
 			r.Get("/backup", s.handleBackup)
 			r.Get("/export.zip", s.handleExportZip)
 			r.Post("/import", s.handleImport)
+			r.Get(strings.TrimPrefix(core.PortablePath, "/api/v1"), portable.Handler())
 		})
 	})
 
@@ -417,6 +418,7 @@ func (s *Server) registerWithCore(ctx context.Context) error {
 		Offers:    linkOffers,
 		Uses:      linkUses,
 		Services:  serviceUses,
+		Portable:  portable,
 	}
 	if s.cfg.BaseURL != "" {
 		m.OIDC = &core.OIDCRequest{RedirectURIs: []string{s.cfg.BaseURL + "/api/v1/auth/oidc/callback"}}

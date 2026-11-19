@@ -55,7 +55,7 @@ Add `X-Pocket-Source: shortcut` (or `app`) to have your changes named so in a no
 
 `GET /dashboard` (Homepage: `notes`, `edited_today`, `open_tasks`, `due_tasks`, `last_sync` …),
 `GET/PUT /storage`, `POST /storage/test`, `POST /sync`, `GET/PUT /settings`, `GET /trash`,
-`POST /trash/{id}/restore`, `GET /export.zip`, `POST /import` (files or a zip), `GET /backup` (admin),
+`POST /trash/{id}/restore`, `GET /export.zip`, `POST /import` (files or a zip; front matter `title`/`created`/`updated` honoured, notes already there skipped), `GET /pocket/portable` (Pocket Move), `GET /backup` (admin),
 `GET /integrations`, `PUT /integrations/{svc|app}/{name}`, `GET /tools` and the homelab tools under
 `/tools/…` (link search, bookmark, people from Pocket Contacts for `@` — `GET /tools/contacts?q=` →
 `{enabled, contacts: [{id, name, detail, initials, color, photo, url, markdown}]}`, `enabled: false` when
