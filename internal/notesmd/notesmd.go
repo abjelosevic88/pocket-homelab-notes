@@ -206,6 +206,18 @@ func plain(line string) string {
 	return strings.TrimSpace(spacesRe.ReplaceAllString(t, " "))
 }
 
+// Plain is a piece of Markdown as plain words on one line: no list marks,
+// checkboxes, emphasis, heading signs or link addresses.
+func Plain(text string) string {
+	var out []string
+	for _, line := range Lines(text) {
+		if t := plain(line); t != "" {
+			out = append(out, t)
+		}
+	}
+	return strings.Join(out, " ")
+}
+
 func truncate(s string, n int) string {
 	if utf8.RuneCountInString(s) <= n {
 		return s

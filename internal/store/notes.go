@@ -807,6 +807,37 @@ func (s *Store) NoteDashboard(ctx context.Context, userID int64) Dashboard {
 	return d
 }
 
+// NotesOfDay answers a person's notes of one day (from ≤ … < to): changed are
+// the ones last changed in it, newest first; made are the ones made in it and
+// changed again on a later day, oldest first. Both walk an index, so a day
+// years back costs as little as today. At most limit of each.
+func (s *Store) NotesOfDay(ctx context.Context, userID int64, from, to time.Time, limit int) (changed, made []Note, err error) {
+	list := func(where string, args ...any) ([]Note, error) {
+		rows, err := s.DB.QueryContext(ctx, `SELECT `+noteCols+` FROM notes WHERE user_id = ? AND `+where+` LIMIT ?`, append(append([]any{userID}, args...), limit)...)
+		if err != nil {
+			return nil, err
+		}
+		defer rows.Close()
+		out := []Note{}
+		for rows.Next() {
+			n, err := scanNote(rows, false)
+			if err != nil {
+				return nil, err
+			}
+			out = append(out, *n)
+		}
+		return out, rows.Err()
+	}
+	if changed, err = list(`modified >= ? AND modified < ? ORDER BY modified DESC`, from.Unix(), to.Unix()); err != nil {
+		return nil, nil, err
+	}
+	// created_at is UTC text with or without a fraction ("…:05Z", "…:05.123Z"):
+	// bounds cut at the second sort right against both.
+	const second = "2006-01-02T15:04:05"
+	made, err = list(`created_at >= ? AND created_at < ? AND modified >= ? ORDER BY created_at`, from.UTC().Format(second), to.UTC().Format(second), to.Unix())
+	return changed, made, err
+}
+
 // ChangeStamp sums up a person's notes in one string that changes whenever a
 // note is added, changed, moved, starred or deleted.
 func (s *Store) ChangeStamp(ctx context.Context, userID int64) string {

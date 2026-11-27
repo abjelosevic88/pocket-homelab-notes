@@ -32,6 +32,16 @@ var portable = &core.Portable{
 	},
 }
 
+// capabilities are what Pocket Search, Pocket Day and Pocket Hub may ask
+// here for a person (docs/capabilities.md in pocket-homelab-core): one value
+// for the manifest, the /pocket routes and linkAllows.
+var capabilities = core.Capabilities{
+	Search:  &core.Searchable{What: "Your notes, by title and text", Kinds: []string{"note"}, Bangs: []string{"notes"}},
+	Day:     &core.DayFeed{Label: "Notes", One: "note", Many: "notes", Unit: "count", What: "The notes you wrote or changed that day, and that day's daily note"},
+	Widget:  &core.Widget{Title: "Recent notes", What: "The notes you changed last, pinned ones first"},
+	Capture: &core.QuickCapture{Kinds: []core.CaptureKind{{Kind: "note", Label: "Note", What: "A new note in the folder your new notes go to", Fields: []string{"title"}}}},
+}
+
 // linkUses are the Pocket apps whose data the editor's homelab tools put into
 // a note, and Pocket Files, which can hold the notes folder itself.
 var linkUses = []core.Use{
@@ -67,7 +77,7 @@ var linkRoutes = []linkRoute{
 var errLinkScope = errors.New("outside the link's scope")
 
 func linkAllows(scopes []string, r *http.Request) bool {
-	if portable.LinkAllows(scopes, r) {
+	if portable.LinkAllows(scopes, r) || capabilities.LinkAllows(scopes, r) {
 		return true
 	}
 	for _, lr := range linkRoutes {
@@ -97,6 +107,9 @@ func (s *Server) linkUser(ctx context.Context, tok string, r *http.Request) (*st
 	}
 	if !linkAllows(strings.Fields(in.Scope), r) {
 		return nil, errLinkScope
+	}
+	if v, _ := r.Context().Value(viaKey).(*linkVia); v != nil && in.App != nil {
+		v.slug, v.name = in.App.Slug, in.App.Name
 	}
 	return s.coreIdentityUser(ctx, in)
 }

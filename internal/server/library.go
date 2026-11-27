@@ -3,6 +3,7 @@ package server
 import (
 	"context"
 	"crypto/sha1"
+	"database/sql"
 	"encoding/hex"
 	"errors"
 	"fmt"
@@ -728,6 +729,9 @@ type NoteInput struct {
 	Modified *int64  `json:"modified"`
 	// Created backdates a new note (imports); zero = now.
 	Created time.Time `json:"-"`
+	// Saved runs in the transaction that indexes a new note, with its id set
+	// (a capture keeps its receipt there, so the same request never makes two).
+	Saved func(tx *sql.Tx, n *store.Note) error `json:"-"`
 }
 
 // uniquePath finds a free file name for title in category: "Title.md",
@@ -807,7 +811,11 @@ func (s *Server) createNote(ctx context.Context, uid int64, in NoteInput, source
 	if in.Pinned != nil {
 		n.Pinned = *in.Pinned
 	}
-	if err := s.store.InsertNote(ctx, n, fileIDNum(ent.FileID), s.noteEvent(ctx, uid, "notes.created", n, source)); err != nil {
+	var saved core.CommitHook
+	if in.Saved != nil {
+		saved = func(tx *sql.Tx) error { return in.Saved(tx, n) }
+	}
+	if err := s.store.InsertNote(ctx, n, fileIDNum(ent.FileID), s.noteEvent(ctx, uid, "notes.created", n, source), saved); err != nil {
 		return nil, err
 	}
 	s.saveMeta(ctx, n, tags, links)

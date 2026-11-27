@@ -15,7 +15,23 @@ import (
 
 type ctxKey int
 
-const userKey ctxKey = 1
+const (
+	userKey ctxKey = 1
+	viaKey  ctxKey = 2
+)
+
+// linkVia is the Pocket app a request came from when it carries a link
+// token: requireAuth puts an empty one into the request, linkUser fills it.
+type linkVia struct{ slug, name string }
+
+// viaApp answers the Pocket app acting for the person in this request
+// ("hub", "Pocket Hub"), both empty when the person asked themself.
+func viaApp(r *http.Request) (slug, name string) {
+	if v, _ := r.Context().Value(viaKey).(*linkVia); v != nil {
+		return v.slug, v.name
+	}
+	return "", ""
+}
 
 const sessionCookie = "pn_session"
 
@@ -35,6 +51,7 @@ func actorID(ctx context.Context) int64 {
 // or trusted proxy header depending on AUTH_MODE.
 func (s *Server) requireAuth(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		r = r.WithContext(context.WithValue(r.Context(), viaKey, &linkVia{}))
 		u, err := s.resolveUser(r)
 		if errors.Is(err, errLinkScope) {
 			writeErr(w, http.StatusForbidden, "this Pocket Core link does not cover "+r.Method+" "+r.URL.Path)

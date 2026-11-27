@@ -51,6 +51,24 @@ Add `X-Pocket-Source: shortcut` (or `app`) to have your changes named so in a no
 | `POST /templates/{id}/use {title?, folder?, here?}` | a new note from it in one step: title from its pattern, in its folder, else `here`, else the default folder |
 | `POST /templates/preview {pattern, name}` | what a title pattern gives today |
 
+## For Pocket Search, Day and Hub
+
+The four routes every Pocket app answers the same way (capabilities in Pocket Core), so Pocket
+Search, Pocket Day and Pocket Hub work with Pocket Notes without knowing it. You can call them
+yourself too, signed in or with an API token. They answer only your own notes; the three `GET`
+ones change nothing.
+
+| | |
+| --- | --- |
+| `GET /pocket/search?q=&limit=` | `{items: [{id, title, snippet, kind: "note", date, url, score}]}`: the search above, filters included, best first (higher `score` = better); `snippet` is plain text; 8 unless `limit` says more, 50 at most |
+| `GET /pocket/day/{YYYY-MM-DD}[?tz=Europe/Berlin]` | `{date, summary, items: [{id, time, title, sub, kind, url}]}`: the notes made that day (`written`), the older ones changed that day (`edited`) and its daily note (`daily`). `time` is `HH:MM` of the last change (of the making, for a note changed again since), `sub` the folder, `summary` a line like `2 notes written, 1 edited`. The day is counted in `tz`, else in the server's time zone; a day with nothing answers no items |
+| `GET /pocket/widget` | `{line, items: [{id, title, detail, url}], url}`: six notes, pinned ones first (three at most), then the ones changed last; `detail` is the day and the folder (`today · Recipes`), `line` how many changed today |
+| `POST /pocket/capture {request_id, kind?: "note", title?, text?}` | a new note in the folder your new notes go to (Settings → "New notes go to"); no title → its first line. `201 {id, title, url}`. `request_id` (16–80 letters, digits, `_`, `-`) names the try: sent again it answers the same note and adds nothing. `400 {error}` when there is nothing to keep |
+
+Another Pocket app reaches each of them with its own scope and nothing else: `pocket:search`,
+`pocket:day`, `pocket:widget`, `pocket:capture`. A note kept through `pocket:capture` names that
+app in its history.
+
 ## The rest
 
 `GET /dashboard` (Homepage: `notes`, `edited_today`, `open_tasks`, `due_tasks`, `last_sync` …),

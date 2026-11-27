@@ -56,6 +56,10 @@ type Server struct {
 
 	oidc   *oidcProvider // keyed on the issuer; rebuilt by provider() when it changes
 	oidcMu sync.Mutex
+
+	// captures holds one lock per person (uid → *sync.Mutex): a quick line
+	// sent twice at once still becomes one note.
+	captures sync.Map
 }
 
 // New creates a server.
@@ -277,6 +281,12 @@ func (s *Server) Router() http.Handler {
 			r.Get("/export.zip", s.handleExportZip)
 			r.Post("/import", s.handleImport)
 			r.Get(strings.TrimPrefix(core.PortablePath, "/api/v1"), portable.Handler())
+
+			// What Pocket Search, Day and Hub ask every app (capabilities in links.go).
+			r.Get(strings.TrimPrefix(core.SearchPath, "/api/v1"), core.SearchHandler(s.pocketSearch))
+			r.Get(strings.TrimPrefix(core.DayPath, "/api/v1")+"{date}", core.DayHandler(s.pocketDay))
+			r.Get(strings.TrimPrefix(core.WidgetPath, "/api/v1"), core.WidgetHandler(s.pocketWidget))
+			r.Post(strings.TrimPrefix(core.CapturePath, "/api/v1"), capabilities.Capture.CaptureHandler(s.pocketCapture))
 		})
 	})
 
@@ -410,15 +420,16 @@ func (s *Server) coreLoop(ctx context.Context) {
 
 func (s *Server) registerWithCore(ctx context.Context) error {
 	m := core.Manifest{
-		Slug: "notes", Name: "Pocket Notes",
+		Slug: "notes", Name: "Pocket Notes", Category: "Everyday",
 		Description: "Markdown notes kept as plain files where you choose (this server, a folder, WebDAV, your Nextcloud or your Pocket Files), with full-text search, tags, links between notes, tasks, daily notes, version history, trash, sharing with people and public links, a rich editor with homelab tools, and Nextcloud Notes' own API for its apps.",
 		Icon:        "/favicon.svg", Version: Version,
 		URL: s.cfg.CoreAppURL, PublicURL: s.cfg.BaseURL, HealthPath: "/healthz", EnvPrefix: "NOTES",
-		Publishes: []string{"notes.created", "notes.updated", "notes.deleted"},
-		Offers:    linkOffers,
-		Uses:      linkUses,
-		Services:  serviceUses,
-		Portable:  portable,
+		Publishes:    []string{"notes.created", "notes.updated", "notes.deleted"},
+		Offers:       linkOffers,
+		Uses:         linkUses,
+		Services:     serviceUses,
+		Portable:     portable,
+		Capabilities: capabilities,
 	}
 	if s.cfg.BaseURL != "" {
 		m.OIDC = &core.OIDCRequest{RedirectURIs: []string{s.cfg.BaseURL + "/api/v1/auth/oidc/callback"}}

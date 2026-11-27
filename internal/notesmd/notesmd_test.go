@@ -69,3 +69,13 @@ func TestToggleAndNames(t *testing.T) {
 		t.Errorf("folder %q", got)
 	}
 }
+
+func TestPlain(t *testing.T) {
+	got := Plain("# Bread\n\n- [ ] **flour** and _water_\n2. see [the mill](https://mill.example/a) ![oven](oven.png)\n\n> rest ~~never~~")
+	if got != "Bread flour and water see the mill rest never" {
+		t.Errorf("%q", got)
+	}
+	if Plain(" \n\n") != "" {
+		t.Error("empty lines are not words")
+	}
+}

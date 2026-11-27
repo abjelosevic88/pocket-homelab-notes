@@ -117,6 +117,9 @@ Notes apps and the Pocket Homelab app work against it too.
 - Pocket Core: "Sign in with Pocket Core", each person's own service accounts for the integrations,
   app links for Pocket Habits / Money / Garage / Podcasts / Documents, `notes.created/updated/deleted` events,
   and `notes:read` / `notes:write` for other Pocket apps.
+- Works with Pocket Search, Pocket Day and Pocket Hub on its own: Search finds your notes, Day shows
+  what you wrote and changed each day, Hub shows your recent notes and keeps a quick line as a new
+  note. Nobody adds Pocket Notes to those apps: it tells Pocket Core what it can do and they find it.
 - `GET /api/v1/dashboard` for Homepage, Prometheus `/metrics`, API tokens, dark mode, a PWA.
 
 ## Run it
@@ -147,7 +150,7 @@ API token from Settings → Apps & API.
 - [Configuration](docs/configuration.md) — every environment variable
 - [Where notes live](docs/storage.md) — storage kinds, sync, conflicts, moving, ids
 - [Nextcloud Notes compatibility](docs/nextcloud-notes-api.md)
-- [HTTP API](docs/api.md) — notes, search, tasks, capture, Shortcuts
+- [HTTP API](docs/api.md) — notes, search, tasks, capture, Shortcuts, what Pocket Search, Day and Hub ask
 - [Backup](docs/backup.md)
 - [Roadmap](docs/roadmap.md)
 

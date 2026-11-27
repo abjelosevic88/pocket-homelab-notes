@@ -5,6 +5,7 @@ import (
 	"io"
 	"log/slog"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -41,5 +42,35 @@ func TestMigrationDropsPaperlessSettings(t *testing.T) {
 	}
 	if st.UserSetting(ctx, u.ID, "svc.forgejo.key") != "fj-key" || st.UserSetting(ctx, u.ID, "app.documents.mode") != "core" {
 		t.Error("other settings touched")
+	}
+}
+
+// A day's notes (NotesOfDay, for Pocket Day) are found through the indexes on
+// when a note changed and when it was made (0005), however many notes there are.
+func TestNotesOfDayUsesIndexes(t *testing.T) {
+	st, err := Open(filepath.Join(t.TempDir(), "t.db"), slog.New(slog.NewTextHandler(io.Discard, nil)))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer st.Close()
+	for _, q := range []string{
+		`SELECT ` + noteCols + ` FROM notes WHERE user_id = 1 AND modified >= 1 AND modified < 2 ORDER BY modified DESC LIMIT 200`,
+		`SELECT ` + noteCols + ` FROM notes WHERE user_id = 1 AND created_at >= 'a' AND created_at < 'b' AND modified >= 2 ORDER BY created_at LIMIT 200`,
+	} {
+		rows, err := st.DB.Query(`EXPLAIN QUERY PLAN ` + q)
+		if err != nil {
+			t.Fatal(err)
+		}
+		plan := ""
+		for rows.Next() {
+			var id, parent, unused int
+			var detail string
+			_ = rows.Scan(&id, &parent, &unused, &detail)
+			plan += detail + "; "
+		}
+		rows.Close()
+		if !strings.Contains(plan, "INDEX notes_user_") || strings.Contains(plan, "TEMP B-TREE") || strings.Contains(plan, "SCAN") {
+			t.Errorf("plan for %s: %s", q, plan)
+		}
 	}
 }
