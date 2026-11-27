@@ -14,7 +14,7 @@ import { HistoryModal, MoveModal, PeopleModal, ShareModal } from './NoteDialogs'
 import { exportHTML, printNote } from '../lib/export'
 import { copyText } from '../lib/clipboard'
 import type { NoteAction } from './NoteMenu'
-import { AskButton } from './AskButton'
+import { AskButton } from '../pocket-ui/AskButton'
 import { TemplateBanner, TemplateForm, TemplateSettings, isTemplateNote } from './Templates'
 
 type Status = 'saved' | 'dirty' | 'saving' | 'error' | 'conflict' | 'offline'

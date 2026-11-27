@@ -5,6 +5,7 @@ WORKDIR /src/web
 COPY web/package.json web/package-lock.json* ./
 RUN npm ci --no-audit --no-fund
 COPY web/ ./
+RUN cd src/pocket-ui && sha256sum -c SHA256SUMS
 RUN npm run build
 
 # ---------- 2. build the Go binary ----------

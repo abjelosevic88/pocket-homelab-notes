@@ -19,7 +19,7 @@ import Settings from './pages/Settings'
 import NewFrom from './pages/NewFrom'
 import Share from './pages/Share'
 import EmbedNote, { EmbedClosed, EmbedGuard } from './pages/EmbedNote'
-import { ErrorBoundary } from './components/ErrorBoundary'
+import { ErrorBoundary } from './pocket-ui/ErrorBoundary'
 
 function Gate({ children }: { children: React.ReactNode }) {
   const { status, user } = useApp()

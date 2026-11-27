@@ -468,7 +468,7 @@ func (s *Server) handlePutIntegration(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
-	go s.reportModes(context.Background())
+	s.modes.Soon()
 	writeJSON(w, http.StatusOK, map[string]string{"mode": s.integrationMode(ctx, uid, kind, name)})
 }
 

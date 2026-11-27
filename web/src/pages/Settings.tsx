@@ -1,4 +1,4 @@
-import { AskButton } from '../components/AskButton'
+import { AskButton } from '../pocket-ui/AskButton'
 import React, { useEffect, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { api, upload, V1 } from '../lib/api'

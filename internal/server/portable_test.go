@@ -38,6 +38,7 @@ func fakeMoveCore(t *testing.T) *httptest.Server {
 			"active": true, "kind": "delegated", "scope": scope, "audience": "notes", "iss": "https://core.test",
 			"exp":  time.Now().Add(time.Hour).Unix(),
 			"user": map[string]any{"sub": "sub-" + parts[2], "email": parts[2] + "@example.com", "name": parts[2]},
+			"app":  map[string]any{"id": 9, "slug": "move", "name": "Pocket Move"},
 		})
 	}))
 	t.Cleanup(srv.Close)

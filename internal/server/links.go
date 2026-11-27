@@ -2,13 +2,9 @@ package server
 
 import (
 	"context"
-	"errors"
-	"net/http"
-	"regexp"
-	"strings"
 
 	core "github.com/abjelosevic88/pocket-homelab-core/sdk"
-	"github.com/abjelosevic88/pocket-homelab-notes/internal/store"
+	"github.com/abjelosevic88/pocket-homelab-core/sdk/appkit"
 )
 
 // Pocket Core app links (docs/links.md in pocket-homelab-core): another
@@ -59,67 +55,27 @@ var linkUses = []core.Use{
 	{App: "draw", Scopes: []string{"drawings:read", "drawings:write"}, Reason: "Show your sketches and diagrams from Pocket Draw inside a note, and start a new one from a note"},
 }
 
-type linkRoute struct {
-	methods string
-	path    *regexp.Regexp
-	scope   string // "" = any linked app
+// linkRoutes are the requests a linked app may make with its scopes; every
+// other route stays closed to it (appkit.Routes, with the Portable and
+// Capabilities routes added by linkAllows).
+var linkRoutes = appkit.Routes{
+	appkit.R("GET", `^/api/v1/auth/me$`, ""),
+	appkit.R("GET", `^/api/v1/(notes|search|suggest|resolve|mentions|folders|tags|tasks|daily|calendar|dashboard|templates)$`, "notes:read"),
+	appkit.R("GET", `^/api/v1/notes/\d+(/backlinks|/attachment)?$`, "notes:read"),
+	appkit.R("POST", `^/api/v1/(notes|capture|daily)$`, "notes:write"),
+	appkit.R("POST", `^/api/v1/notes/\d+/(append|tasks|attachments)$`, "notes:write"),
+	appkit.R("PUT", `^/api/v1/notes/\d+$`, "notes:write"),
 }
 
-var linkRoutes = []linkRoute{
-	{"GET", regexp.MustCompile(`^/api/v1/auth/me$`), ""},
-	{"GET", regexp.MustCompile(`^/api/v1/(notes|search|suggest|resolve|mentions|folders|tags|tasks|daily|calendar|dashboard|templates)$`), "notes:read"},
-	{"GET", regexp.MustCompile(`^/api/v1/notes/\d+(/backlinks|/attachment)?$`), "notes:read"},
-	{"POST", regexp.MustCompile(`^/api/v1/(notes|capture|daily)$`), "notes:write"},
-	{"POST", regexp.MustCompile(`^/api/v1/notes/\d+/(append|tasks|attachments)$`), "notes:write"},
-	{"PUT", regexp.MustCompile(`^/api/v1/notes/\d+$`), "notes:write"},
-}
+// linkAllows reports whether a link token with these scopes may make a
+// request: linkRoutes plus the Portable and Capabilities routes.
+var linkAllows = linkRoutes.Allow(portable, capabilities)
 
-var errLinkScope = errors.New("outside the link's scope")
-
-func linkAllows(scopes []string, r *http.Request) bool {
-	if portable.LinkAllows(scopes, r) || capabilities.LinkAllows(scopes, r) {
-		return true
-	}
-	for _, lr := range linkRoutes {
-		if !strings.Contains(" "+lr.methods+" ", " "+r.Method+" ") || !lr.path.MatchString(r.URL.Path) {
-			continue
-		}
-		if lr.scope == "" {
-			return true
-		}
-		for _, sc := range scopes {
-			if sc == lr.scope {
-				return true
-			}
-		}
-	}
-	return false
-}
-
-// linkUser validates a pcx_ token and maps it to the person it acts for.
-func (s *Server) linkUser(ctx context.Context, tok string, r *http.Request) (*store.User, error) {
-	in, err := s.core.Introspect(ctx, tok)
-	if err != nil {
-		return nil, err
-	}
-	if !in.Active || !in.Delegated() || in.User == nil || in.User.Email == "" {
-		return nil, http.ErrNoCookie
-	}
-	if !linkAllows(strings.Fields(in.Scope), r) {
-		return nil, errLinkScope
-	}
-	if v, _ := r.Context().Value(viaKey).(*linkVia); v != nil && in.App != nil {
-		v.slug, v.name = in.App.Slug, in.App.Name
-	}
-	return s.coreIdentityUser(ctx, in)
-}
-
-// reportModes tells Core how each person is connected to the services and
-// apps this one uses (Core → Links shows "Direct" for typed-in ones).
-func (s *Server) reportModes(ctx context.Context) {
-	if !s.core.Configured() {
-		return
-	}
+// connModes is how each person is connected to the services and apps this
+// one uses (Core → Links shows "Direct" for typed-in ones); s.modes
+// (appkit.ModeReporter) sends them after each registration and when a
+// person changes a connection.
+func (s *Server) connModes(ctx context.Context) ([]core.ConnMode, error) {
 	var modes []core.ConnMode
 	for _, uid := range s.store.UserIDs(ctx) {
 		email := s.userEmail(ctx, uid)
@@ -157,7 +113,5 @@ func (s *Server) reportModes(ctx context.Context) {
 			modes = append(modes, core.ConnMode{User: email, Target: u.App, Mode: mode})
 		}
 	}
-	if err := s.core.ReportModes(ctx, modes); err != nil {
-		s.log.Debug("pocket core: report modes", "err", err)
-	}
+	return modes, nil
 }

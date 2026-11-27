@@ -3,6 +3,7 @@ package server
 import (
 	"context"
 	core "github.com/abjelosevic88/pocket-homelab-core/sdk"
+	"github.com/abjelosevic88/pocket-homelab-core/sdk/appkit"
 	"github.com/abjelosevic88/pocket-homelab-notes/internal/store"
 	"strings"
 )
@@ -32,21 +33,4 @@ func (s *Server) identityUser(ctx context.Context, issuer, subject, email, name 
 	}
 	return s.store.GetUser(ctx, id)
 }
-func (s *Server) sessionUser(ctx context.Context, id string) (*store.User, error) {
-	u, err := s.store.GetSessionUser(ctx, id)
-	if err != nil {
-		return nil, err
-	}
-	if err = s.core.ValidateSession(ctx, id); err != nil {
-		return nil, err
-	}
-	return u, nil
-}
-
-func (s *Server) coreOutboxHealth(ctx context.Context) any {
-	status, err := s.core.OutboxStatus(ctx)
-	if err != nil {
-		return map[string]any{"available": false}
-	}
-	return status
-}
+func (s *Server) coreOutboxHealth(ctx context.Context) any { return appkit.OutboxHealth(ctx, s.core) }

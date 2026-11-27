@@ -1,11 +1,14 @@
+// Pocket UI kit — synced from pocket-homelab-core/sdk/ui by scripts/sync-sdk.py. Change it there, not here.
 import React from 'react'
 
-// A crash in one screen shows what went wrong (and is written to the server's log) instead of
-// leaving the whole page blank.
+// A crash in one screen shows what went wrong instead of leaving the whole page blank, and is
+// reported to the server's log (POST /api/v1/client-error, appkit.ClientErrors; an app without
+// that route just answers 404 and nothing else happens).
 export class ErrorBoundary extends React.Component<{ children: React.ReactNode; where?: string }, { error: Error | null }> {
   state = { error: null as Error | null }
   static getDerivedStateFromError(error: Error) { return { error } }
   componentDidCatch(error: Error, info: React.ErrorInfo) {
+    console.error(this.props.where || 'app', error, info?.componentStack)
     fetch('/api/v1/client-error', {
       method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ message: String(error?.message || error), stack: String(error?.stack || '').slice(0, 4000), component: String(info?.componentStack || '').slice(0, 2000), url: location.href, where: this.props.where || '', agent: navigator.userAgent }),

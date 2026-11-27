@@ -436,7 +436,7 @@ func (s *Server) handlePutStorage(w http.ResponseWriter, r *http.Request) {
 		res["sync_error"] = err.Error()
 	}
 	res["sync"] = stats
-	go s.reportModes(context.Background())
+	s.modes.Soon()
 	writeJSON(w, http.StatusOK, res)
 }
 
